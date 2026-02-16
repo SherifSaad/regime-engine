@@ -1,0 +1,24 @@
+[project]
+name = "regime-engine"
+version = "0.1.0"
+description = "Deterministic market regime engine with 11 metrics"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pandas>=2.0",
+  "numpy>=1.24",
+  "python-dateutil",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6", "black>=24.0"]
+
+[project.scripts]
+regime-cli = "regime_engine.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/regime_engine"]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
