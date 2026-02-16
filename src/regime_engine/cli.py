@@ -14,6 +14,7 @@ from regime_engine.metrics import (
     compute_structural_score,
     compute_volatility_regime,
     compute_momentum_state,
+    compute_liquidity_context,
 )
 
 
@@ -94,6 +95,14 @@ def main() -> None:
         n_c=20,
     )
 
+    liquidity = compute_liquidity_context(
+        df,
+        vrs=float(vol_regime["vrs"]),
+        er=float(momentum["er"]),
+        n_dv=20,
+        h=5,
+    )
+
     asof = df.index[-1].date().isoformat()
 
     result = {
@@ -102,6 +111,7 @@ def main() -> None:
         "key_levels": kl,
         "vol_regime": vol_regime,
         "momentum": momentum,
+        "liquidity": liquidity,
         "metrics": {
             "price": float(close.iloc[-1]),
             "ema_fast": float(ema_fast.iloc[-1]),
@@ -116,6 +126,7 @@ def main() -> None:
             "structural_score": float(ss),
             "cms": float(momentum["cms"]),
             "ii": float(momentum["ii"]),
+            "lq": float(liquidity["lq"]),
         },
     }
 

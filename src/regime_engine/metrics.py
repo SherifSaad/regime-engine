@@ -844,3 +844,133 @@ def compute_momentum_state(
         state = "NEUTRAL_RANGE"
 
     return {"state": state, "cms": float(cms), "ii": float(ii), "er": float(ER)}
+
+
+def compute_liquidity_context(
+    df: pd.DataFrame,
+    vrs: float,
+    er: float,
+    n_dv: int = 20,
+    h: int = 5,
+) -> dict:
+    """
+    Returns:
+      {
+        "lq": float in [0,1],
+        "trend": "IMPROVING"|"STABLE"|"DETERIORATING",
+        "label": "DEEP"|"NORMAL"|"THIN",
+      }
+
+    Tier B proxy:
+      A: relative dollar volume (DV / SMA(DV))
+      B: volatility burden = 1 - VRS
+      C: gap penalty
+      D: choppiness (ER)
+    """
+    if len(df) < max(n_dv + 5, h + 5):
+        return {"lq": 0.5, "trend": "STABLE", "label": "NORMAL"}
+
+    close = df["close"]
+    open_ = df["open"] if "open" in df.columns else close
+
+    P = float(close.iloc[-1])
+
+    # Dollar volume (DV)
+    has_vol = "volume" in df.columns and df["volume"].notna().any()
+    if has_vol:
+        vol = df["volume"].astype(float)
+        dv = vol * close
+        dv_sma = dv.rolling(n_dv).mean()
+        dv_t = float(dv.iloc[-1])
+        dv_sma_t = float(dv_sma.iloc[-1]) if not np.isnan(dv_sma.iloc[-1]) else np.nan
+        if np.isnan(dv_sma_t) or dv_sma_t <= 0:
+            RDV = 1.0
+        else:
+            RDV = dv_t / dv_sma_t
+        A = clamp(clamp(RDV, 0.0, 2.0) / 2.0, 0.0, 1.0)
+    else:
+        # fallback when volume missing: neutral participation
+        A = 0.5
+
+    # Volatility burden
+    B = clamp(1.0 - clamp(float(vrs), 0.0, 1.0), 0.0, 1.0)
+
+    # Gap / discontinuity penalty: GapAbs = |Open_t - Close_{t-1}| / ATR_f
+    # We'll approximate ATR_f with 20 by default for this metric (consistent with others).
+    atr_f = float(compute_atr(df, 20).iloc[-1])
+    if np.isnan(atr_f) or atr_f <= 0 or len(df) < 2:
+        C = 1.0
+    else:
+        gap_abs = abs(float(open_.iloc[-1]) - float(close.iloc[-2])) / atr_f
+        C = 1.0 - clamp(clamp(gap_abs, 0.0, 2.0) / 2.0, 0.0, 1.0)
+
+    # Choppiness proxy
+    D = clamp(float(er), 0.0, 1.0)
+
+    # Liquidity score
+    lq = clamp(0.45 * A + 0.25 * B + 0.15 * C + 0.15 * D, 0.0, 1.0)
+
+    # Trend: compare to SMA over h
+    # We compute LQ series over the last (h+1) bars using the same formula quickly.
+    # Deterministic and lightweight.
+    lq_series = []
+    for i in range(h + 1):
+        sub = df.iloc[: len(df) - i]
+        if len(sub) < max(n_dv + 5, 25):
+            continue
+
+        close_s = sub["close"]
+        open_s = sub["open"] if "open" in sub.columns else close_s
+
+        # A (RDV)
+        if "volume" in sub.columns and sub["volume"].notna().any():
+            vol_s = sub["volume"].astype(float)
+            dv_s = vol_s * close_s
+            dv_sma_s = dv_s.rolling(n_dv).mean()
+            dv_t_s = float(dv_s.iloc[-1])
+            dv_sma_t_s = float(dv_sma_s.iloc[-1]) if not np.isnan(dv_sma_s.iloc[-1]) else np.nan
+            if np.isnan(dv_sma_t_s) or dv_sma_t_s <= 0:
+                RDV_s = 1.0
+            else:
+                RDV_s = dv_t_s / dv_sma_t_s
+            A_s = clamp(clamp(RDV_s, 0.0, 2.0) / 2.0, 0.0, 1.0)
+        else:
+            A_s = 0.5
+
+        # B constant from vrs
+        B_s = B
+
+        atr_s = float(compute_atr(sub, 20).iloc[-1])
+        if np.isnan(atr_s) or atr_s <= 0 or len(sub) < 2:
+            C_s = 1.0
+        else:
+            gap_abs_s = abs(float(open_s.iloc[-1]) - float(close_s.iloc[-2])) / atr_s
+            C_s = 1.0 - clamp(clamp(gap_abs_s, 0.0, 2.0) / 2.0, 0.0, 1.0)
+
+        D_s = D  # ER treated as current snapshot for trend (good enough)
+        lq_s = clamp(0.45 * A_s + 0.25 * B_s + 0.15 * C_s + 0.15 * D_s, 0.0, 1.0)
+        lq_series.append(lq_s)
+
+    if len(lq_series) >= 2:
+        lq_series = list(reversed(lq_series))  # oldest -> newest
+        sma_h = float(np.mean(lq_series[:-1]))
+        delta = lq_series[-1] - sma_h
+    else:
+        delta = 0.0
+
+    if delta <= -0.05:
+        trend = "DETERIORATING"
+    elif delta >= 0.05:
+        trend = "IMPROVING"
+    else:
+        trend = "STABLE"
+
+    # Discrete label
+    if lq >= 0.70:
+        label = "DEEP"
+    elif lq >= 0.40:
+        label = "NORMAL"
+    else:
+        label = "THIN"
+
+    return {"lq": float(lq), "trend": trend, "label": label}
