@@ -16,6 +16,7 @@ from regime_engine.metrics import (
     compute_momentum_state,
     compute_liquidity_context,
     compute_instability_index,
+    compute_asymmetry_metric,
 )
 
 
@@ -114,6 +115,19 @@ def main() -> None:
         n_f=20,
     )
 
+    asm = compute_asymmetry_metric(
+        df,
+        bp_up=bp_up,
+        bp_dn=bp_dn,
+        dsr=dsr,
+        rl=risk_level,
+        mb=market_bias,
+        er=float(momentum["er"]),
+        iix=iix,
+        H=60,
+        gamma=1.0,
+    )
+
     asof = df.index[-1].date().isoformat()
 
     result = {
@@ -139,6 +153,7 @@ def main() -> None:
             "ii": float(momentum["ii"]),
             "lq": float(liquidity["lq"]),
             "instability_index": float(iix),
+            "asymmetry_metric": float(asm),
         },
     }
 

@@ -1067,3 +1067,62 @@ def compute_instability_index(
     iix = clamp(0.25 * A + 0.25 * B + 0.20 * C + 0.15 * D + 0.15 * E, 0.0, 1.0)
     iix = clamp(iix + 0.10 * K, 0.0, 1.0)
     return float(iix)
+
+
+def compute_asymmetry_metric(
+    df: pd.DataFrame,
+    bp_up: float,
+    bp_dn: float,
+    dsr: float,
+    rl: float,   # included for completeness (not used directly in formula)
+    mb: float,
+    er: float,   # included for completeness (not used directly in formula)
+    iix: float,
+    H: int = 60,
+    gamma: float = 1.0,
+) -> float:
+    """
+    Asymmetry Metric (ASM) in [-1, +1]
+
+    A = BP_up - BP_dn
+    B = -DSR
+    C = -tanh(gamma * ln(SkewVol)), where SkewVol = sigma_minus / sigma_plus
+    Amp = 0.5 + 0.5 * IIX  (applies only when raw < 0)
+
+    ASM_raw = 0.45*A + 0.15*MB + 0.20*C + 0.20*B
+    if ASM_raw < 0: ASM = clip(ASM_raw * Amp, -1, 1)
+    else:           ASM = clip(ASM_raw, -1, 1)
+    """
+    if len(df) < max(H + 5, 5):
+        return 0.0
+
+    close = df["close"]
+    r = compute_log_returns(close).tail(H)
+
+    # downside/upside semi-vols
+    neg = r[r < 0]
+    pos = r[r > 0]
+
+    sigma_minus = float(neg.std()) if len(neg) >= 2 else 0.0
+    sigma_plus = float(pos.std()) if len(pos) >= 2 else 0.0
+
+    # Avoid divide-by-zero and weirdness
+    eps = 1e-12
+    skew_vol = (sigma_minus + eps) / (sigma_plus + eps)
+
+    A = clamp(float(bp_up) - float(bp_dn), -1.0, 1.0)
+    B = -clamp(float(dsr), 0.0, 1.0)
+    C = -float(np.tanh(float(gamma) * float(np.log(skew_vol))))
+
+    MB = clamp(float(mb), -1.0, 1.0)
+    Amp = 0.5 + 0.5 * clamp(float(iix), 0.0, 1.0)
+
+    asm_raw = 0.45 * A + 0.15 * MB + 0.20 * C + 0.20 * B
+    asm_raw = clamp(asm_raw, -1.0, 1.0)
+
+    if asm_raw < 0:
+        asm = clamp(asm_raw * Amp, -1.0, 1.0)
+    else:
+        asm = asm_raw
+
+    return float(asm)
