@@ -11,6 +11,7 @@ from regime_engine.metrics import (
     compute_breakout_probability,
     compute_downside_shock_risk,
     compute_key_levels,
+    compute_structural_score,
 )
 
 
@@ -58,6 +59,17 @@ def main() -> None:
         m=2.5,
     )
 
+    ss = compute_structural_score(
+        df,
+        mb=market_bias,
+        rl=risk_level,
+        dsr=dsr,
+        key_levels=kl,
+        n_f=20,
+        n_s=100,
+        n_c=20,
+    )
+
     asof = df.index[-1].date().isoformat()
 
     result = {
@@ -74,6 +86,7 @@ def main() -> None:
             "breakout_up": float(bp_up),
             "breakout_down": float(bp_dn),
             "downside_shock_risk": float(dsr),
+            "structural_score": float(ss),
         },
     }
 

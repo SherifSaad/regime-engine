@@ -591,3 +591,84 @@ def compute_key_levels(
         "supports": [{"price": float(l), "strength": float(s)} for l, s in supports],
         "resistances": [{"price": float(l), "strength": float(s)} for l, s in resistances],
     }
+
+
+def compute_structural_score(
+    df: pd.DataFrame,
+    mb: float,
+    rl: float,
+    dsr: float,
+    key_levels: dict,
+    n_f: int = 20,
+    n_s: int = 100,
+    n_c: int = 20,
+) -> float:
+    """
+    Structural Score (SS) in [-1, +1]
+
+    ER (efficiency ratio):
+      ER = |P - P[n_c]| / sum(|P[i]-P[i-1]| over last n_c)
+    Stab = 1 - (0.6*RL + 0.4*DSR)
+    C (key-level integrity):
+      support hold: tanh((P - S1)/ATR_f)
+      resistance pressure: tanh((R1 - P)/ATR_f)
+      C = 0.6*s1*H_sup + 0.4*r1*H_res
+    Final:
+      SS = clip( MB*(0.55 + 0.25*ER + 0.20*Stab) + 0.25*C, -1, 1 )
+    """
+    if len(df) < max(n_s + 5, n_c + 5, n_f + 5):
+        return 0.0
+
+    close = df["close"]
+    P = float(close.iloc[-1])
+
+    atr_f_series = compute_atr(df, n_f)
+    ATR_f = float(atr_f_series.iloc[-1])
+    if np.isnan(ATR_f) or ATR_f <= 0:
+        return 0.0
+
+    # --- ER (Kaufman efficiency ratio) in [0,1]
+    P_nc = float(close.iloc[-1 - n_c])
+    net = abs(P - P_nc)
+
+    diffs = close.diff().abs().tail(n_c)
+    denom = float(diffs.sum())
+    ER = 0.0 if denom <= 0 else clamp(net / denom, 0.0, 1.0)
+
+    # --- Stability Stab in [0,1]
+    Stab = 1.0 - (0.6 * clamp(float(rl), 0.0, 1.0) + 0.4 * clamp(float(dsr), 0.0, 1.0))
+    Stab = clamp(Stab, 0.0, 1.0)
+
+    # --- Key-level integrity C in [-1,1]
+    supports = key_levels.get("supports", []) if isinstance(key_levels, dict) else []
+    resistances = key_levels.get("resistances", []) if isinstance(key_levels, dict) else []
+
+    if supports:
+        S1 = float(supports[0]["price"])
+        s1 = clamp(float(supports[0]["strength"]), 0.0, 1.0)
+    else:
+        S1, s1 = None, 0.0
+
+    if resistances:
+        R1 = float(resistances[0]["price"])
+        r1 = clamp(float(resistances[0]["strength"]), 0.0, 1.0)
+    else:
+        R1, r1 = None, 0.0
+
+    H_sup = 0.0
+    if S1 is not None:
+        delta_sup = (P - S1) / ATR_f
+        H_sup = float(np.tanh(delta_sup))
+
+    H_res = 0.0
+    if R1 is not None:
+        delta_res = (R1 - P) / ATR_f
+        H_res = float(np.tanh(delta_res))
+
+    C = 0.6 * s1 * H_sup + 0.4 * r1 * H_res
+    C = clamp(C, -1.0, 1.0)
+
+    # --- Final SS
+    mb_f = clamp(float(mb), -1.0, 1.0)
+    ss = mb_f * (0.55 + 0.25 * ER + 0.20 * Stab) + 0.25 * C
+    return clamp(ss, -1.0, 1.0)
