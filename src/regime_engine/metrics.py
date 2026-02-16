@@ -250,3 +250,108 @@ def compute_breakout_probability(
     bp_dn = D_dn * quality_dn * hold_factor
 
     return clamp(bp_up, 0.0, 1.0), clamp(bp_dn, 0.0, 1.0)
+
+
+def compute_downside_shock_risk(
+    df: pd.DataFrame,
+    mb: float,
+    rl: float,
+    n_f: int = 20,
+    n_s: int = 100,
+    H: int = 60,
+    m: float = 2.5,
+    lam: float = 30.0,
+    B_max: float = 2.0,
+    C_max: float = 3.0,
+    D_max: float = 2.0,
+    w1: float = 0.30,
+    w2: float = 0.20,
+    w3: float = 0.20,
+    w4: float = 0.10,
+    w5: float = 0.20,
+) -> float:
+    """
+    Downside Shock Risk (DSR) in [0,1]
+
+    A_tail = 1 - exp(-lam * A) where A = freq(r < -tau) over last H bars
+    tau = m * sigma_f  (sigma_f = std(log returns, n_f))
+
+    B = clip( sigma_minus / sigma_plus, 0, B_max) / B_max
+    C = clip( (EMA_s - P)/ATR_f, 0, C_max) / C_max
+    D = clip( -g, 0, D_max) / D_max , g = (Open - PrevClose)/ATR_f
+    DSR_raw = clip(w1*A_tail + w2*B + w3*C + w4*D + w5*RL, 0, 1)
+    Bear = (1 - MB)/2
+    DSR = clip( DSR_raw * (0.6 + 0.4*Bear), 0, 1 )
+    """
+    if len(df) < max(n_s + 5, H + 5, n_f + 5):
+        return 0.0
+
+    close = df["close"]
+    open_ = df["open"]
+
+    # core series
+    r = compute_log_returns(close)
+
+    atr_f_series = compute_atr(df, n_f)
+    ATR_f = float(atr_f_series.iloc[-1])
+    if np.isnan(ATR_f) or ATR_f <= 0:
+        return 0.0
+
+    ema_s_series = compute_ema(close, n_s)
+    EMA_s = float(ema_s_series.iloc[-1])
+    P = float(close.iloc[-1])
+
+    # sigma_f for tau
+    sigma_f = float(r.rolling(n_f).std().iloc[-1])
+    if np.isnan(sigma_f) or sigma_f <= 0:
+        return 0.0
+
+    tau = m * sigma_f
+
+    # --- A) recent downside tail frequency
+    window_r = r.tail(H)
+    if window_r.isna().all():
+        A_tail = 0.0
+    else:
+        I = (window_r < (-tau)).astype(float)
+        A = float(I.mean())  # freq in [0,1]
+        A_tail = float(1.0 - np.exp(-lam * A))
+
+    A_tail = clamp(A_tail, 0.0, 1.0)
+
+    # --- B) downside dominance (semi-vol ratio)
+    rH = r.tail(H).dropna()
+    if len(rH) < max(10, H // 4):
+        B = 0.0
+    else:
+        neg = rH[rH < 0]
+        pos = rH[rH > 0]
+
+        sigma_minus = float(neg.std()) if len(neg) >= 5 else 0.0
+        sigma_plus = float(pos.std()) if len(pos) >= 5 else 0.0
+
+        if sigma_plus <= 0:
+            ratio = B_max  # if no upside variation, treat as max downside dominance
+        else:
+            ratio = sigma_minus / sigma_plus
+
+        B = clamp(ratio, 0.0, B_max) / B_max
+
+    # --- C) trend fragility
+    C_raw = (EMA_s - P) / ATR_f
+    C = clamp(C_raw, 0.0, C_max) / C_max
+
+    # --- D) downside gap pressure
+    prev_close = float(close.shift(1).iloc[-1])
+    O = float(open_.iloc[-1])
+    g = (O - prev_close) / ATR_f
+    D = clamp(-g, 0.0, D_max) / D_max
+
+    # --- blend + bearish alignment
+    dsr_raw = w1 * A_tail + w2 * B + w3 * C + w4 * D + w5 * clamp(float(rl), 0.0, 1.0)
+    dsr_raw = clamp(dsr_raw, 0.0, 1.0)
+
+    Bear = clamp((1.0 - float(mb)) / 2.0, 0.0, 1.0)
+    dsr = dsr_raw * (0.6 + 0.4 * Bear)
+
+    return clamp(dsr, 0.0, 1.0)

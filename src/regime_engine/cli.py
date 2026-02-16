@@ -9,6 +9,7 @@ from regime_engine.metrics import (
     compute_market_bias,
     compute_risk_level,
     compute_breakout_probability,
+    compute_downside_shock_risk,
 )
 
 
@@ -38,6 +39,16 @@ def main() -> None:
         level_lookback=50,
     )
 
+    dsr = compute_downside_shock_risk(
+        df,
+        mb=market_bias,
+        rl=risk_level,
+        n_f=20,
+        n_s=100,
+        H=60,
+        m=2.5,
+    )
+
     asof = df.index[-1].date().isoformat()
 
     result = {
@@ -52,6 +63,7 @@ def main() -> None:
             "risk_level": float(risk_level),
             "breakout_up": float(bp_up),
             "breakout_down": float(bp_dn),
+            "downside_shock_risk": float(dsr),
         },
     }
 
