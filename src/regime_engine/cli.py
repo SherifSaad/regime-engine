@@ -10,6 +10,7 @@ from regime_engine.metrics import (
     compute_risk_level,
     compute_breakout_probability,
     compute_downside_shock_risk,
+    compute_key_levels,
 )
 
 
@@ -29,6 +30,12 @@ def main() -> None:
     market_bias = compute_market_bias(df, n_f=20, n_s=100, alpha=0.7, beta=0.3)
     risk_level = compute_risk_level(df, n_f=20, n_s=100, peak_window=252)
 
+    kl = compute_key_levels(df, n_f=20, W=250, k=3, eta=0.35, N=3, min_strength=0.35)
+
+    # nearest resistance above and nearest support below
+    L_up = kl["resistances"][0]["price"] if kl["resistances"] else None
+    L_dn = kl["supports"][0]["price"] if kl["supports"] else None
+
     bp_up, bp_dn = compute_breakout_probability(
         df,
         mb=market_bias,
@@ -37,6 +44,8 @@ def main() -> None:
         atr_short_n=10,
         atr_long_n=50,
         level_lookback=50,
+        L_up=L_up,
+        L_dn=L_dn,
     )
 
     dsr = compute_downside_shock_risk(
@@ -54,6 +63,7 @@ def main() -> None:
     result = {
         "symbol": args.symbol.upper(),
         "asof": asof,
+        "key_levels": kl,
         "metrics": {
             "price": float(close.iloc[-1]),
             "ema_fast": float(ema_fast.iloc[-1]),

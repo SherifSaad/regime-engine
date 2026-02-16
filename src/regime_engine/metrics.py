@@ -156,6 +156,8 @@ def compute_breakout_probability(
     level_lookback: int = 50,
     k: float = 1.0,
     sigma_cap: float = 0.035,
+    L_up: float | None = None,
+    L_dn: float | None = None,
 ) -> tuple[float, float]:
     """
     Breakout Probability (BP) in [0,1], returns (BP_up, BP_dn)
@@ -201,11 +203,13 @@ def compute_breakout_probability(
     if np.isnan(ATR_f) or ATR_f <= 0:
         return 0.0, 0.0
 
-    # Proxy levels (deterministic)
-    L_up = float(high.rolling(level_lookback).max().iloc[-1])
-    L_dn = float(low.rolling(level_lookback).min().iloc[-1])
-
     P = float(close.iloc[-1])
+
+    # Key levels if given, otherwise proxy levels (deterministic fallback)
+    if L_up is None:
+        L_up = float(high.rolling(level_lookback).max().iloc[-1])
+    if L_dn is None:
+        L_dn = float(low.rolling(level_lookback).min().iloc[-1])
 
     # Distances in ATR units (never negative)
     d_up = max(0.0, (L_up - P) / ATR_f)
@@ -355,3 +359,235 @@ def compute_downside_shock_risk(
     dsr = dsr_raw * (0.6 + 0.4 * Bear)
 
     return clamp(dsr, 0.0, 1.0)
+
+
+def compute_key_levels(
+    df: pd.DataFrame,
+    n_f: int = 20,
+    W: int = 250,
+    k: int = 3,
+    eta: float = 0.35,     # epsilon = eta * ATR_f
+    delta: float = 0.30,   # touch tolerance in ATR units
+    tau_T: float = 3.0,
+    h: int = 5,            # rejection horizon
+    R_max: float = 2.0,
+    rho: float = 5.0,      # round number closeness scale
+    bins: int = 60,        # volume-at-price bins
+    N: int = 3,            # keep top N each side
+    min_strength: float = 0.35,
+) -> dict:
+    """
+    Returns:
+      {
+        "supports": [{"price": float, "strength": float}, ...],
+        "resistances": [{"price": float, "strength": float}, ...]
+      }
+    Deterministic, price+volume only.
+    """
+    if len(df) < max(W, (2 * k + 5), n_f + 5):
+        return {"supports": [], "resistances": []}
+
+    # last W bars only (search window)
+    d = df.tail(W).copy()
+    close = d["close"]
+    high = d["high"]
+    low = d["low"]
+    vol = d["volume"] if "volume" in d.columns else None
+
+    atr_f_series = compute_atr(d, n_f)
+    ATR_f = float(atr_f_series.iloc[-1])
+    if np.isnan(ATR_f) or ATR_f <= 0:
+        return {"supports": [], "resistances": []}
+
+    eps = eta * ATR_f
+    P = float(close.iloc[-1])
+
+    # -----------------------------
+    # helpers
+    # -----------------------------
+    def _round_step(price: float) -> float:
+        if price < 20:
+            return 1.0
+        if price < 200:
+            return 5.0
+        if price < 2000:
+            return 25.0
+        return 100.0
+
+    def _cluster_candidates(cands: list[tuple[float, float]]) -> list[tuple[float, float]]:
+        """
+        cands: list of (level_price, score in [0,1])
+        returns clusters -> list of (L*, S*)
+        Single-link clustering by sorting and grouping levels within eps.
+        """
+        if not cands:
+            return []
+
+        cands_sorted = sorted(cands, key=lambda x: x[0])
+
+        clusters: list[list[tuple[float, float]]] = []
+        current = [cands_sorted[0]]
+
+        for lvl, sc in cands_sorted[1:]:
+            prev_lvl = current[-1][0]
+            if abs(lvl - prev_lvl) <= eps:
+                current.append((lvl, sc))
+            else:
+                clusters.append(current)
+                current = [(lvl, sc)]
+        clusters.append(current)
+
+        out: list[tuple[float, float]] = []
+        for cl in clusters:
+            weights = np.array([max(0.0, float(s)) for _, s in cl], dtype=float)
+            levels = np.array([float(l) for l, _ in cl], dtype=float)
+
+            wsum = float(weights.sum())
+            if wsum <= 0:
+                continue
+
+            L_star = float((weights * levels).sum() / wsum)
+
+            # S* = 1 - Π(1 - s)
+            prod = 1.0
+            for _, s in cl:
+                prod *= (1.0 - clamp(float(s), 0.0, 1.0))
+            S_star = float(1.0 - prod)
+
+            out.append((L_star, clamp(S_star, 0.0, 1.0)))
+        return out
+
+    # -----------------------------
+    # Evidence 1: Swing pivots
+    # -----------------------------
+    pivot_cands: list[tuple[float, float]] = []
+
+    # pivot high if high[t] is max in [t-k, t+k]
+    # pivot low if low[t] is min in [t-k, t+k]
+    for i in range(k, len(d) - k):
+        window_high = high.iloc[i - k : i + k + 1]
+        window_low = low.iloc[i - k : i + k + 1]
+        hi = float(high.iloc[i])
+        lo = float(low.iloc[i])
+
+        is_pivot_high = hi == float(window_high.max())
+        is_pivot_low = lo == float(window_low.min())
+
+        # score pivots by: touches, rejection, recency
+        if is_pivot_high or is_pivot_low:
+            L = hi if is_pivot_high else lo
+
+            # touches: count bars where |close - L|/ATR <= delta
+            dist = (close - L).abs() / ATR_f
+            touches_idx = dist[dist <= delta].index
+            touch_count = int(len(touches_idx))
+
+            T = float(1.0 - np.exp(-(touch_count / tau_T)))  # saturating
+
+            # rejection: for each touch, measure move away over h bars
+            rej_vals = []
+            for ts in touches_idx:
+                pos = d.index.get_loc(ts)
+                if isinstance(pos, slice):
+                    continue
+                j = pos + h
+                if j >= len(d):
+                    continue
+                rej = abs(float(close.iloc[j]) - float(close.iloc[pos])) / ATR_f
+                rej_vals.append(rej)
+
+            if rej_vals:
+                rej_mean = float(np.mean(rej_vals))
+                R = clamp(rej_mean / R_max, 0.0, 1.0)
+            else:
+                R = 0.0
+
+            # recency: bars since last touch
+            if touch_count > 0:
+                last_touch = touches_idx[-1]
+                age = len(d) - 1 - d.index.get_loc(last_touch)
+            else:
+                age = W
+
+            tau_Q = W / 3.0
+            Q = float(np.exp(-(age / tau_Q)))
+
+            score_pivot = clamp(0.5 * T + 0.3 * R + 0.2 * Q, 0.0, 1.0)
+            pivot_cands.append((float(L), float(score_pivot)))
+
+    # -----------------------------
+    # Evidence 2: Volume-at-price (optional)
+    # -----------------------------
+    vap_cands: list[tuple[float, float]] = []
+    if vol is not None and vol.notna().any():
+        typ = (high + low + close) / 3.0
+        pmin = float(typ.min())
+        pmax = float(typ.max())
+        if pmax > pmin:
+            edges = np.linspace(pmin, pmax, bins + 1)
+            hist = np.zeros(bins, dtype=float)
+
+            # accumulate volume into bins
+            idxs = np.searchsorted(edges, typ.values, side="right") - 1
+            idxs = np.clip(idxs, 0, bins - 1)
+            for b, v in zip(idxs, vol.values):
+                if np.isnan(v):
+                    continue
+                hist[int(b)] += float(v)
+
+            if hist.max() > 0:
+                # pick top few peaks (simple: top 5 bins)
+                top_bins = np.argsort(hist)[-5:][::-1]
+                for b in top_bins:
+                    center = float((edges[b] + edges[b + 1]) / 2.0)
+                    score_vap = float(hist[b] / hist.max())
+                    vap_cands.append((center, clamp(score_vap, 0.0, 1.0)))
+
+    # -----------------------------
+    # Evidence 3: Round numbers
+    # -----------------------------
+    round_cands: list[tuple[float, float]] = []
+    step = _round_step(P)
+    span = 10.0 * ATR_f
+
+    lo_lvl = P - span
+    hi_lvl = P + span
+    start = np.floor(lo_lvl / step) * step
+    end = np.ceil(hi_lvl / step) * step
+
+    L = start
+    while L <= end + 1e-9:
+        score_round = float(np.exp(-(abs(P - L) / (rho * ATR_f))))
+        round_cands.append((float(L), clamp(score_round, 0.0, 1.0)))
+        L += step
+
+    # -----------------------------
+    # Merge + cluster all candidates
+    # -----------------------------
+    all_cands = pivot_cands + vap_cands + round_cands
+    clusters = _cluster_candidates(all_cands)
+
+    # classify support / resistance
+    supports = []
+    resistances = []
+    for lvl, s in clusters:
+        if s < min_strength:
+            continue
+        if lvl < P:
+            supports.append((lvl, s))
+        elif lvl > P:
+            resistances.append((lvl, s))
+
+    # keep nearest N, but prioritize strength too (simple sort: strength desc, then distance asc)
+    def _rank(side: list[tuple[float, float]], is_support: bool):
+        if is_support:
+            return sorted(side, key=lambda x: (-x[1], abs(P - x[0])))
+        return sorted(side, key=lambda x: (-x[1], abs(x[0] - P)))
+
+    supports = _rank(supports, True)[:N]
+    resistances = _rank(resistances, False)[:N]
+
+    return {
+        "supports": [{"price": float(l), "strength": float(s)} for l, s in supports],
+        "resistances": [{"price": float(l), "strength": float(s)} for l, s in resistances],
+    }
