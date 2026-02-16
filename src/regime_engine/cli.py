@@ -23,14 +23,21 @@ def main() -> None:
 
     market_bias = compute_market_bias(close, fast=20, slow=100)
 
-    print("Latest Values:")
-    print({
-        "price": float(close.iloc[-1]),
-        "ema_fast": float(ema_fast.iloc[-1]),
-        "ema_slow": float(ema_slow.iloc[-1]),
-        "realized_vol": float(rv.iloc[-1]),
-        "market_bias": float(market_bias),
-    })
+    asof = df.index[-1].date().isoformat()
+
+    result = {
+        "symbol": args.symbol.upper(),
+        "asof": asof,
+        "metrics": {
+            "price": float(close.iloc[-1]),
+            "ema_fast": float(ema_fast.iloc[-1]),
+            "ema_slow": float(ema_slow.iloc[-1]),
+            "realized_vol": float(rv.iloc[-1]),
+            "market_bias": float(market_bias),
+        },
+    }
+
+    print(result)
 
 
 if __name__ == "__main__":
