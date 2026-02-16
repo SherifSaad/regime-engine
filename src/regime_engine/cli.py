@@ -15,6 +15,7 @@ from regime_engine.metrics import (
     compute_volatility_regime,
     compute_momentum_state,
     compute_liquidity_context,
+    compute_instability_index,
 )
 
 
@@ -103,6 +104,16 @@ def main() -> None:
         h=5,
     )
 
+    iix = compute_instability_index(
+        df,
+        rl=risk_level,
+        dsr=dsr,
+        vrs=float(vol_regime["vrs"]),
+        lq=float(liquidity["lq"]),
+        er=float(momentum["er"]),
+        n_f=20,
+    )
+
     asof = df.index[-1].date().isoformat()
 
     result = {
@@ -127,6 +138,7 @@ def main() -> None:
             "cms": float(momentum["cms"]),
             "ii": float(momentum["ii"]),
             "lq": float(liquidity["lq"]),
+            "instability_index": float(iix),
         },
     }
 

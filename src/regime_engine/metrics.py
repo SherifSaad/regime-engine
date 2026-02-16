@@ -974,3 +974,96 @@ def compute_liquidity_context(
         label = "THIN"
 
     return {"lq": float(lq), "trend": trend, "label": label}
+
+
+def compute_instability_index(
+    df: pd.DataFrame,
+    rl: float,
+    dsr: float,
+    vrs: float,
+    lq: float,
+    er: float,
+    n_f: int = 20,
+) -> float:
+    """
+    Instability Index (IIX) in [0,1]
+      A = VRS
+      B = 0.6*RL + 0.4*DSR
+      C = 1 - LQ
+      D = 1 - ER
+      E = clip(GapAbs, 0, 2)/2
+      K = clip(dVRS, 0, 0.10)/0.10
+      IIX = clip(0.25A + 0.25B + 0.20C + 0.15D + 0.15E, 0, 1)
+      IIX = clip(IIX + 0.10K, 0, 1)
+    """
+    if len(df) < max(n_f + 5, 3):
+        return 0.0
+
+    A = clamp(float(vrs), 0.0, 1.0)
+    B = clamp(0.6 * clamp(float(rl), 0.0, 1.0) + 0.4 * clamp(float(dsr), 0.0, 1.0), 0.0, 1.0)
+    C = clamp(1.0 - clamp(float(lq), 0.0, 1.0), 0.0, 1.0)
+    D = clamp(1.0 - clamp(float(er), 0.0, 1.0), 0.0, 1.0)
+
+    # GapAbs = |Open_t - Close_{t-1}| / ATR_f
+    atr_f = float(compute_atr(df, n_f).iloc[-1])
+    if np.isnan(atr_f) or atr_f <= 0:
+        E = 0.0
+    else:
+        open_ = df["open"] if "open" in df.columns else df["close"]
+        gap_abs = abs(float(open_.iloc[-1]) - float(df["close"].iloc[-2])) / atr_f
+        E = clamp(clamp(gap_abs, 0.0, 2.0) / 2.0, 0.0, 1.0)
+
+    # Acceleration kicker: dVRS
+    # We estimate previous VRS using the same helper to avoid inconsistency
+    # (but without recursion). Here we use simple prev VRS from returns/ATR with shift.
+    close = df["close"]
+    r = compute_log_returns(close)
+    sigma_f = float(r.rolling(20).std().iloc[-1])
+    sigma_s = float(r.rolling(100).std().iloc[-1])
+    sigma_f_prev = float(r.rolling(20).std().shift(1).iloc[-1])
+    sigma_s_prev = float(r.rolling(100).std().shift(1).iloc[-1])
+
+    if np.isnan(sigma_f) or sigma_f <= 0 or np.isnan(sigma_f_prev) or sigma_f_prev <= 0:
+        K = 0.0
+    else:
+        if np.isnan(sigma_s) or sigma_s <= 0:
+            sigma_s = 1e-12
+        if np.isnan(sigma_s_prev) or sigma_s_prev <= 0:
+            sigma_s_prev = 1e-12
+
+        VR = sigma_f / sigma_s
+        VR_prev = sigma_f_prev / sigma_s_prev
+
+        A_v = clamp(clamp(VR, 0.0, 3.0) / 3.0, 0.0, 1.0)
+        A_v_prev = clamp(clamp(VR_prev, 0.0, 3.0) / 3.0, 0.0, 1.0)
+
+        atr_short = compute_atr(df, 10)
+        atr_long = compute_atr(df, 50)
+        atr_short_prev = atr_short.shift(1)
+        atr_long_prev = atr_long.shift(1)
+
+        ATR_s = float(atr_short.iloc[-1])
+        ATR_l = float(atr_long.iloc[-1])
+        ATR_s_prev = float(atr_short_prev.iloc[-1])
+        ATR_l_prev = float(atr_long_prev.iloc[-1])
+
+        if np.isnan(ATR_s) or np.isnan(ATR_l) or ATR_l <= 0:
+            B_v = 0.5
+        else:
+            B_v = clamp(clamp(ATR_s / ATR_l, 0.0, 2.0) / 2.0, 0.0, 1.0)
+
+        if np.isnan(ATR_s_prev) or np.isnan(ATR_l_prev) or ATR_l_prev <= 0:
+            B_v_prev = B_v
+        else:
+            B_v_prev = clamp(clamp(ATR_s_prev / ATR_l_prev, 0.0, 2.0) / 2.0, 0.0, 1.0)
+
+        C_v = clamp(float(rl), 0.0, 1.0)
+        vrs_prev = clamp(0.50 * A_v_prev + 0.30 * B_v_prev + 0.20 * C_v, 0.0, 1.0)
+        vrs_now = clamp(0.50 * A_v + 0.30 * B_v + 0.20 * C_v, 0.0, 1.0)
+
+        dVRS = vrs_now - vrs_prev
+        K = clamp(clamp(dVRS, 0.0, 0.10) / 0.10, 0.0, 1.0)
+
+    iix = clamp(0.25 * A + 0.25 * B + 0.20 * C + 0.15 * D + 0.15 * E, 0.0, 1.0)
+    iix = clamp(iix + 0.10 * K, 0.0, 1.0)
+    return float(iix)
