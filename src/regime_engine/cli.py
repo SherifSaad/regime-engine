@@ -5,7 +5,7 @@ from regime_engine.features import (
     compute_returns,
     compute_realized_vol,
 )
-from regime_engine.metrics import compute_market_bias
+from regime_engine.metrics import compute_market_bias, compute_risk_level
 
 
 def main() -> None:
@@ -21,7 +21,8 @@ def main() -> None:
     returns = compute_returns(close)
     rv = compute_realized_vol(returns)
 
-    market_bias = compute_market_bias(close, fast=20, slow=100)
+    market_bias = compute_market_bias(df, n_f=20, n_s=100, alpha=0.7, beta=0.3)
+    risk_level = compute_risk_level(df, n_f=20, n_s=100, peak_window=252)
 
     asof = df.index[-1].date().isoformat()
 
@@ -34,6 +35,7 @@ def main() -> None:
             "ema_slow": float(ema_slow.iloc[-1]),
             "realized_vol": float(rv.iloc[-1]),
             "market_bias": float(market_bias),
+            "risk_level": float(risk_level),
         },
     }
 

@@ -51,3 +51,7 @@ def compute_downside_semi_vol(returns: pd.Series, period: int = 20) -> pd.Series
     downside = returns.copy()
     downside[downside > 0] = 0
     return downside.rolling(period).std() * np.sqrt(252)
+
+
+def compute_log_returns(close: pd.Series) -> pd.Series:
+    return np.log(close / close.shift(1))
