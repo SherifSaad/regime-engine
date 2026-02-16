@@ -770,3 +770,77 @@ def compute_volatility_regime(
         trend = "FLAT"
 
     return {"vrs": float(vrs), "label": label, "trend": trend}
+
+
+def compute_momentum_state(
+    df: pd.DataFrame,
+    mb: float,
+    ss: float,
+    vrs: float,
+    bp_up: float,
+    bp_dn: float,
+    n_f: int = 20,
+    n_m: int = 20,
+    k_m: float = 2.0,
+    n_c: int = 20,  # for ER (same as SS)
+) -> dict:
+    """
+    Returns:
+      {
+        "state": "STRONG_UP_IMPULSE"|"WEAK_UP_DRIFT"|"NEUTRAL_RANGE"|"WEAK_DOWN_DRIFT"|"STRONG_DOWN_IMPULSE",
+        "cms": float in [-1,1],
+        "ii": float in [0,1],
+        "er": float in [0,1],
+      }
+    """
+    if len(df) < max(n_m + 5, n_f + 5, n_c + 5):
+        return {"state": "NEUTRAL_RANGE", "cms": 0.0, "ii": 0.0, "er": 0.0}
+
+    close = df["close"]
+
+    atr_f_series = compute_atr(df, n_f)
+    ATR_f = float(atr_f_series.iloc[-1])
+    if np.isnan(ATR_f) or ATR_f <= 0:
+        return {"state": "NEUTRAL_RANGE", "cms": 0.0, "ii": 0.0, "er": 0.0}
+
+    P = float(close.iloc[-1])
+    P_nm = float(close.iloc[-1 - n_m])
+
+    # M_t in ATR units
+    M = (P - P_nm) / ATR_f
+
+    # ER over n_c
+    P_nc = float(close.iloc[-1 - n_c])
+    net = abs(P - P_nc)
+    diffs = close.diff().abs().tail(n_c)
+    denom = float(diffs.sum())
+    ER = 0.0 if denom <= 0 else clamp(net / denom, 0.0, 1.0)
+
+    mb_f = clamp(float(mb), -1.0, 1.0)
+    ss_f = clamp(float(ss), -1.0, 1.0)
+
+    # CMS in [-1,1]
+    cms = 0.50 * mb_f + 0.30 * float(np.tanh(M / k_m)) + 0.20 * ss_f
+    cms = clamp(cms, -1.0, 1.0)
+
+    # Impulse intensity
+    Align = clamp(float(bp_up) - float(bp_dn), -1.0, 1.0)
+    ii = abs(cms) * (0.6 * ER + 0.4 * (1.0 - clamp(float(vrs), 0.0, 1.0))) * (0.7 * abs(Align) + 0.3)
+    ii = clamp(ii, 0.0, 1.0)
+
+    # State rules
+    if cms >= 0.55 and ii >= 0.50:
+        state = "STRONG_UP_IMPULSE"
+    elif cms >= 0.20 and ii < 0.50:
+        state = "WEAK_UP_DRIFT"
+    elif abs(cms) < 0.20:
+        state = "NEUTRAL_RANGE"
+    elif cms <= -0.55 and ii >= 0.50:
+        state = "STRONG_DOWN_IMPULSE"
+    elif cms <= -0.20 and ii < 0.50:
+        state = "WEAK_DOWN_DRIFT"
+    else:
+        # edge cases between thresholds
+        state = "NEUTRAL_RANGE"
+
+    return {"state": state, "cms": float(cms), "ii": float(ii), "er": float(ER)}

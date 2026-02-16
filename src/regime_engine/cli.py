@@ -13,6 +13,7 @@ from regime_engine.metrics import (
     compute_key_levels,
     compute_structural_score,
     compute_volatility_regime,
+    compute_momentum_state,
 )
 
 
@@ -80,6 +81,19 @@ def main() -> None:
         n_c=20,
     )
 
+    momentum = compute_momentum_state(
+        df,
+        mb=market_bias,
+        ss=ss,
+        vrs=float(vol_regime["vrs"]),
+        bp_up=bp_up,
+        bp_dn=bp_dn,
+        n_f=20,
+        n_m=20,
+        k_m=2.0,
+        n_c=20,
+    )
+
     asof = df.index[-1].date().isoformat()
 
     result = {
@@ -87,6 +101,7 @@ def main() -> None:
         "asof": asof,
         "key_levels": kl,
         "vol_regime": vol_regime,
+        "momentum": momentum,
         "metrics": {
             "price": float(close.iloc[-1]),
             "ema_fast": float(ema_fast.iloc[-1]),
@@ -99,6 +114,8 @@ def main() -> None:
             "breakout_down": float(bp_dn),
             "downside_shock_risk": float(dsr),
             "structural_score": float(ss),
+            "cms": float(momentum["cms"]),
+            "ii": float(momentum["ii"]),
         },
     }
 
