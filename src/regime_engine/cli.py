@@ -5,6 +5,7 @@ from regime_engine.features import (
     compute_returns,
     compute_realized_vol,
 )
+from regime_engine.metrics import compute_market_bias
 
 
 def main() -> None:
@@ -13,7 +14,6 @@ def main() -> None:
     args = parser.parse_args()
 
     df = load_sample_data(args.symbol)
-
     close = df["close"]
 
     ema_fast = compute_ema(close, 20)
@@ -21,12 +21,15 @@ def main() -> None:
     returns = compute_returns(close)
     rv = compute_realized_vol(returns)
 
+    market_bias = compute_market_bias(close, fast=20, slow=100)
+
     print("Latest Values:")
     print({
-        "price": close.iloc[-1],
-        "ema_fast": ema_fast.iloc[-1],
-        "ema_slow": ema_slow.iloc[-1],
-        "realized_vol": rv.iloc[-1],
+        "price": float(close.iloc[-1]),
+        "ema_fast": float(ema_fast.iloc[-1]),
+        "ema_slow": float(ema_slow.iloc[-1]),
+        "realized_vol": float(rv.iloc[-1]),
+        "market_bias": float(market_bias),
     })
 
 
