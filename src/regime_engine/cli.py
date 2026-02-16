@@ -12,6 +12,7 @@ from regime_engine.metrics import (
     compute_downside_shock_risk,
     compute_key_levels,
     compute_structural_score,
+    compute_volatility_regime,
 )
 
 
@@ -30,6 +31,15 @@ def main() -> None:
 
     market_bias = compute_market_bias(df, n_f=20, n_s=100, alpha=0.7, beta=0.3)
     risk_level = compute_risk_level(df, n_f=20, n_s=100, peak_window=252)
+
+    vol_regime = compute_volatility_regime(
+        df,
+        rl=risk_level,
+        n_f=20,
+        n_s=100,
+        n_sh=10,
+        n_lg=50,
+    )
 
     kl = compute_key_levels(df, n_f=20, W=250, k=3, eta=0.35, N=3, min_strength=0.35)
 
@@ -76,6 +86,7 @@ def main() -> None:
         "symbol": args.symbol.upper(),
         "asof": asof,
         "key_levels": kl,
+        "vol_regime": vol_regime,
         "metrics": {
             "price": float(close.iloc[-1]),
             "ema_fast": float(ema_fast.iloc[-1]),
@@ -83,6 +94,7 @@ def main() -> None:
             "realized_vol": float(rv.iloc[-1]),
             "market_bias": float(market_bias),
             "risk_level": float(risk_level),
+            "vrs": float(vol_regime["vrs"]),
             "breakout_up": float(bp_up),
             "breakout_down": float(bp_dn),
             "downside_shock_risk": float(dsr),

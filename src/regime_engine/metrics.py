@@ -672,3 +672,101 @@ def compute_structural_score(
     mb_f = clamp(float(mb), -1.0, 1.0)
     ss = mb_f * (0.55 + 0.25 * ER + 0.20 * Stab) + 0.25 * C
     return clamp(ss, -1.0, 1.0)
+
+
+def compute_volatility_regime(
+    df: pd.DataFrame,
+    rl: float,
+    n_f: int = 20,
+    n_s: int = 100,
+    n_sh: int = 10,
+    n_lg: int = 50,
+) -> dict:
+    """
+    Returns:
+      {
+        "vrs": float in [0,1],
+        "label": "CALM"|"NORMAL"|"ELEVATED"|"STRESSED",
+        "trend": "RISING"|"FALLING"|"FLAT"
+      }
+    """
+    if len(df) < max(n_s + 5, n_lg + 5):
+        return {"vrs": 0.0, "label": "NORMAL", "trend": "FLAT"}
+
+    close = df["close"]
+    r = compute_log_returns(close)
+
+    sigma_f = float(r.rolling(n_f).std().iloc[-1])
+    sigma_s = float(r.rolling(n_s).std().iloc[-1])
+
+    # avoid division blowups
+    if np.isnan(sigma_f) or sigma_f <= 0:
+        return {"vrs": 0.0, "label": "NORMAL", "trend": "FLAT"}
+    if np.isnan(sigma_s) or sigma_s <= 0:
+        sigma_s = 1e-12
+
+    VR = sigma_f / sigma_s
+
+    atr_short = compute_atr(df, n_sh)
+    atr_long = compute_atr(df, n_lg)
+
+    ATR_s = float(atr_short.iloc[-1])
+    ATR_l = float(atr_long.iloc[-1])
+
+    if np.isnan(ATR_s) or np.isnan(ATR_l) or ATR_l <= 0:
+        AR = 1.0
+    else:
+        AR = ATR_s / ATR_l
+
+    # A) vol ratio score
+    A = clamp(clamp(VR, 0.0, 3.0) / 3.0, 0.0, 1.0)
+
+    # B) ATR expansion score
+    B = clamp(clamp(AR, 0.0, 2.0) / 2.0, 0.0, 1.0)
+
+    # C) risk confirmation
+    C = clamp(float(rl), 0.0, 1.0)
+
+    vrs = clamp(0.50 * A + 0.30 * B + 0.20 * C, 0.0, 1.0)
+
+    # label rules
+    if vrs < 0.25:
+        label = "CALM"
+    elif vrs < 0.45:
+        label = "NORMAL"
+    elif vrs < 0.70:
+        label = "ELEVATED"
+    else:
+        label = "STRESSED"
+
+    # trend tag based on delta VRS
+    # compute previous VRS using previous values (shifted)
+    sigma_f_prev = float(r.rolling(n_f).std().shift(1).iloc[-1])
+    sigma_s_prev = float(r.rolling(n_s).std().shift(1).iloc[-1])
+    if np.isnan(sigma_f_prev) or sigma_f_prev <= 0:
+        vrs_prev = vrs
+    else:
+        if np.isnan(sigma_s_prev) or sigma_s_prev <= 0:
+            sigma_s_prev = 1e-12
+        VR_prev = sigma_f_prev / sigma_s_prev
+
+        ATR_s_prev = float(atr_short.shift(1).iloc[-1])
+        ATR_l_prev = float(atr_long.shift(1).iloc[-1])
+        if np.isnan(ATR_s_prev) or np.isnan(ATR_l_prev) or ATR_l_prev <= 0:
+            AR_prev = AR
+        else:
+            AR_prev = ATR_s_prev / ATR_l_prev
+
+        A_prev = clamp(clamp(VR_prev, 0.0, 3.0) / 3.0, 0.0, 1.0)
+        B_prev = clamp(clamp(AR_prev, 0.0, 2.0) / 2.0, 0.0, 1.0)
+        vrs_prev = clamp(0.50 * A_prev + 0.30 * B_prev + 0.20 * C, 0.0, 1.0)
+
+    dV = vrs - vrs_prev
+    if dV >= 0.03:
+        trend = "RISING"
+    elif dV <= -0.03:
+        trend = "FALLING"
+    else:
+        trend = "FLAT"
+
+    return {"vrs": float(vrs), "label": label, "trend": trend}
