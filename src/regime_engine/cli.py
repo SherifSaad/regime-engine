@@ -5,7 +5,11 @@ from regime_engine.features import (
     compute_returns,
     compute_realized_vol,
 )
-from regime_engine.metrics import compute_market_bias, compute_risk_level
+from regime_engine.metrics import (
+    compute_market_bias,
+    compute_risk_level,
+    compute_breakout_probability,
+)
 
 
 def main() -> None:
@@ -24,6 +28,16 @@ def main() -> None:
     market_bias = compute_market_bias(df, n_f=20, n_s=100, alpha=0.7, beta=0.3)
     risk_level = compute_risk_level(df, n_f=20, n_s=100, peak_window=252)
 
+    bp_up, bp_dn = compute_breakout_probability(
+        df,
+        mb=market_bias,
+        rl=risk_level,
+        n_f=20,
+        atr_short_n=10,
+        atr_long_n=50,
+        level_lookback=50,
+    )
+
     asof = df.index[-1].date().isoformat()
 
     result = {
@@ -36,6 +50,8 @@ def main() -> None:
             "realized_vol": float(rv.iloc[-1]),
             "market_bias": float(market_bias),
             "risk_level": float(risk_level),
+            "breakout_up": float(bp_up),
+            "breakout_down": float(bp_dn),
         },
     }
 

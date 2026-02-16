@@ -144,3 +144,109 @@ def compute_risk_level(
 
     rl = w_A * A + w_B * B + w_C * C + w_D * D
     return clamp(rl, 0.0, 1.0)
+
+
+def compute_breakout_probability(
+    df: pd.DataFrame,
+    mb: float,
+    rl: float,
+    n_f: int = 20,
+    atr_short_n: int = 10,
+    atr_long_n: int = 50,
+    level_lookback: int = 50,
+    k: float = 1.0,
+    sigma_cap: float = 0.035,
+) -> tuple[float, float]:
+    """
+    Breakout Probability (BP) in [0,1], returns (BP_up, BP_dn)
+
+    Uses proxy key levels (until Key Levels metric exists):
+      L_up = rolling max(high, level_lookback)
+      L_dn = rolling min(low, level_lookback)
+
+    Formulas (from your spec):
+      d_up = (L_up - P)/ATR_f
+      d_dn = (P - L_dn)/ATR_f
+      D(d) = exp(-k d)
+
+      Comp = clip(1 - ATR_short/ATR_long, 0, 1)
+      Exp  = clip(ATR_short/ATR_short_prev - 1, 0, 1)
+      E    = 0.6*Comp + 0.4*Exp
+
+      A_up = (1 + MB)/2
+      A_dn = (1 - MB)/2
+      R    = 1 - RL
+
+      H = clip(1 - sigma_f/sigma_cap, 0, 1)
+
+      BP_up = clip(D_up * (0.45E + 0.35A_up + 0.20R) * (0.6H + 0.4), 0, 1)
+      BP_dn = clip(D_dn * (0.45E + 0.35A_dn + 0.20R) * (0.6H + 0.4), 0, 1)
+    """
+    if len(df) < max(n_f + 5, atr_long_n + 5, level_lookback + 5):
+        return 0.0, 0.0
+
+    close = df["close"]
+    high = df["high"]
+    low = df["low"]
+
+    # ATRs
+    atr_f_series = compute_atr(df, n_f)
+    atr_short = compute_atr(df, atr_short_n)
+    atr_long = compute_atr(df, atr_long_n)
+
+    ATR_f = float(atr_f_series.iloc[-1])
+    ATR_s = float(atr_short.iloc[-1])
+    ATR_l = float(atr_long.iloc[-1])
+
+    if np.isnan(ATR_f) or ATR_f <= 0:
+        return 0.0, 0.0
+
+    # Proxy levels (deterministic)
+    L_up = float(high.rolling(level_lookback).max().iloc[-1])
+    L_dn = float(low.rolling(level_lookback).min().iloc[-1])
+
+    P = float(close.iloc[-1])
+
+    # Distances in ATR units (never negative)
+    d_up = max(0.0, (L_up - P) / ATR_f)
+    d_dn = max(0.0, (P - L_dn) / ATR_f)
+
+    D_up = float(np.exp(-k * d_up))
+    D_dn = float(np.exp(-k * d_dn))
+
+    # Energy term
+    if np.isnan(ATR_s) or np.isnan(ATR_l) or ATR_l <= 0:
+        Comp = 0.0
+    else:
+        Comp = clamp(1.0 - (ATR_s / ATR_l), 0.0, 1.0)
+
+    ATR_s_prev = float(atr_short.shift(1).iloc[-1])
+    if np.isnan(ATR_s_prev) or ATR_s_prev <= 0 or np.isnan(ATR_s):
+        Exp = 0.0
+    else:
+        Exp = clamp((ATR_s / ATR_s_prev) - 1.0, 0.0, 1.0)
+
+    E = 0.6 * Comp + 0.4 * Exp  # in [0,1]
+
+    # Alignment + risk-on capacity
+    A_up = clamp((1.0 + float(mb)) / 2.0, 0.0, 1.0)
+    A_dn = clamp((1.0 - float(mb)) / 2.0, 0.0, 1.0)
+    R = clamp(1.0 - float(rl), 0.0, 1.0)
+
+    quality = (0.45 * E) + (0.35 * A_up) + (0.20 * R)
+    quality_dn = (0.45 * E) + (0.35 * A_dn) + (0.20 * R)
+
+    # Hold condition using sigma_f (std of log returns over n_f)
+    r = compute_log_returns(close)
+    sigma_f = float(r.rolling(n_f).std().iloc[-1])
+    if np.isnan(sigma_f) or sigma_cap <= 0:
+        H = 0.0
+    else:
+        H = clamp(1.0 - (sigma_f / sigma_cap), 0.0, 1.0)
+
+    hold_factor = (0.6 * H) + 0.4
+
+    bp_up = D_up * quality * hold_factor
+    bp_dn = D_dn * quality_dn * hold_factor
+
+    return clamp(bp_up, 0.0, 1.0), clamp(bp_dn, 0.0, 1.0)
