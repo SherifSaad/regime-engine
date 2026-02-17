@@ -7,6 +7,11 @@ import pandas as pd
 from regime_engine.features import compute_ema, compute_atr, compute_log_returns
 
 
+def _close_for_returns(df: pd.DataFrame) -> pd.Series:
+    """Use adj_close for return-based metrics when available; else raw close."""
+    return df["adj_close"] if "adj_close" in df.columns else df["close"]
+
+
 def clamp(x: float, lo: float, hi: float) -> float:
     return float(max(lo, min(hi, x)))
 
@@ -81,9 +86,10 @@ def compute_risk_level(
 
     close = df["close"]
     open_ = df["open"]
+    close_ret = _close_for_returns(df)
 
-    # log returns
-    r = compute_log_returns(close)
+    # log returns (adj_close for performance-like metrics)
+    r = compute_log_returns(close_ret)
 
     # realized vol components (std of log returns)
     sigma_f_series = r.rolling(n_f).std()
@@ -126,12 +132,13 @@ def compute_risk_level(
     C1_raw = (ema_s - P) / atr_f
     C1 = clamp(C1_raw, 0.0, C1_max) / C1_max
 
-    # C2: drawdown stress
-    peak = float(close.rolling(peak_window).max().iloc[-1])
+    # C2: drawdown stress (adj_close for performance-like)
+    peak = float(close_ret.rolling(peak_window).max().iloc[-1])
+    P_ret = float(close_ret.iloc[-1])
     if np.isnan(peak) or peak <= 0:
         C2 = 0.0
     else:
-        DD = (peak - P) / peak
+        DD = (peak - P_ret) / peak
         C2 = clamp(DD / DD_max, 0.0, 1.0)
 
     C = 0.5 * C1 + 0.5 * C2
@@ -620,6 +627,7 @@ def compute_structural_score(
         return 0.0
 
     close = df["close"]
+    close_ret = _close_for_returns(df)
     P = float(close.iloc[-1])
 
     atr_f_series = compute_atr(df, n_f)
@@ -627,11 +635,12 @@ def compute_structural_score(
     if np.isnan(ATR_f) or ATR_f <= 0:
         return 0.0
 
-    # --- ER (Kaufman efficiency ratio) in [0,1]
-    P_nc = float(close.iloc[-1 - n_c])
-    net = abs(P - P_nc)
+    # --- ER (Kaufman efficiency ratio) in [0,1] (adj_close for return-like)
+    P_ret = float(close_ret.iloc[-1])
+    P_nc = float(close_ret.iloc[-1 - n_c])
+    net = abs(P_ret - P_nc)
 
-    diffs = close.diff().abs().tail(n_c)
+    diffs = close_ret.diff().abs().tail(n_c)
     denom = float(diffs.sum())
     ER = 0.0 if denom <= 0 else clamp(net / denom, 0.0, 1.0)
 
@@ -693,8 +702,8 @@ def compute_volatility_regime(
     if len(df) < max(n_s + 5, n_lg + 5):
         return {"vrs": 0.0, "label": "NORMAL", "trend": "FLAT"}
 
-    close = df["close"]
-    r = compute_log_returns(close)
+    close_ret = _close_for_returns(df)
+    r = compute_log_returns(close_ret)
 
     sigma_f = float(r.rolling(n_f).std().iloc[-1])
     sigma_s = float(r.rolling(n_s).std().iloc[-1])
@@ -797,6 +806,7 @@ def compute_momentum_state(
         return {"state": "NEUTRAL_RANGE", "cms": 0.0, "ii": 0.0, "er": 0.0}
 
     close = df["close"]
+    close_ret = _close_for_returns(df)
 
     atr_f_series = compute_atr(df, n_f)
     ATR_f = float(atr_f_series.iloc[-1])
@@ -809,10 +819,10 @@ def compute_momentum_state(
     # M_t in ATR units
     M = (P - P_nm) / ATR_f
 
-    # ER over n_c
-    P_nc = float(close.iloc[-1 - n_c])
+    # ER over n_c (adj_close for return-like)
+    P_nc = float(close_ret.iloc[-1 - n_c])
     net = abs(P - P_nc)
-    diffs = close.diff().abs().tail(n_c)
+    diffs = close_ret.diff().abs().tail(n_c)
     denom = float(diffs.sum())
     ER = 0.0 if denom <= 0 else clamp(net / denom, 0.0, 1.0)
 
@@ -1016,8 +1026,8 @@ def compute_instability_index(
     # Acceleration kicker: dVRS
     # We estimate previous VRS using the same helper to avoid inconsistency
     # (but without recursion). Here we use simple prev VRS from returns/ATR with shift.
-    close = df["close"]
-    r = compute_log_returns(close)
+    close_ret = _close_for_returns(df)
+    r = compute_log_returns(close_ret)
     sigma_f = float(r.rolling(20).std().iloc[-1])
     sigma_s = float(r.rolling(100).std().iloc[-1])
     sigma_f_prev = float(r.rolling(20).std().shift(1).iloc[-1])
@@ -1096,8 +1106,8 @@ def compute_asymmetry_metric(
     if len(df) < max(H + 5, 5):
         return 0.0
 
-    close = df["close"]
-    r = compute_log_returns(close).tail(H)
+    close_ret = _close_for_returns(df)
+    r = compute_log_returns(close_ret).tail(H)
 
     # downside/upside semi-vols
     neg = r[r < 0]

@@ -1,0 +1,7 @@
+event_peak_date,event_trough_date,event_max_drawdown,first_warning_date,lead_trading_days_warning_to_peak,lead_trading_days_warning_to_-10%,lead_trading_days_warning_to_-20%,first_panic_date,lead_trading_days_panic_to_-10%,lead_trading_days_panic_to_-20%,first_shock_date,lead_trading_days_shock_to_-10%,lead_trading_days_shock_to_-20%,date_reaches_-10%,date_reaches_-20%,n_days_peak_to_trough
+2001-02-01,2002-10-09,-0.42027334851936216,2002-01-16,0,-219,-86,,,,,,,2001-02-28,2001-09-07,421
+2007-10-09,2009-03-09,-0.5519468867755248,2007-11-09,0,39,168,,,,,,,2008-01-08,2008-07-14,355
+2018-09-20,2018-12-24,-0.19348666335004405,2018-10-10,0,45,,,,,,,,2018-12-14,,65
+2020-02-19,2020-03-23,-0.3371822990581861,2020-03-02,0,-2,8,,,,2020-03-09,-7,3,2020-02-27,2020-03-12,23
+2022-01-03,2022-10-12,-0.24497654244489686,2022-01-24,0,20,97,,,,,,,2022-02-22,2022-06-13,195
+2025-02-19,2025-04-08,-0.1875639628932687,2025-03-06,0,5,,,,,,,,2025-03-13,,34

@@ -1,0 +1,6 @@
+metric,n,mean,median,p25,p75,min,max
+lead_trading_days_shock_to_-10%,1.0,-7.0,-7.0,-7.0,-7.0,-7.0,-7.0
+lead_trading_days_shock_to_-20%,1.0,3.0,3.0,3.0,3.0,3.0,3.0
+lead_trading_days_warning_to_-10%,6.0,-18.666666666666668,12.5,-0.25,34.25,-219.0,45.0
+lead_trading_days_warning_to_-20%,4.0,46.75,52.5,-15.5,114.75,-86.0,168.0
+lead_trading_days_warning_to_peak,6.0,0.0,0.0,0.0,0.0,0.0,0.0

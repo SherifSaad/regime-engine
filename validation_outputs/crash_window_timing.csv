@@ -1,0 +1,4 @@
+crash,peak,trough,first_shock,first_panic_risk,first_trending_bear,days_peak_to_first_risk,days_first_shock_to_trough,days_first_bear_to_trough
+2020_COVID,2020-02-19,2020-03-23,2020-03-09,2020-02-24,2020-03-11,3,10.0,8
+2008_GFC,2007-10-09,2009-03-09,,2008-01-11,2007-11-12,24,,331
+2022_BEAR,2022-01-04,2022-10-13,,2022-07-13,2022-01-25,14,,181

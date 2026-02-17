@@ -1,0 +1,4 @@
+warning_date,warning_regime,lookahead_trading_days,min_return_in_window
+2015-08-24,SHOCK,60,
+2020-03-12,SHOCK,60,
+2020-03-16,SHOCK,60,
