@@ -1,0 +1,773 @@
+Frozen DB Audit Report - Sat 21 Feb 2026 17:42:10 EST
+=================================
+
+=== AAPL - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/AAPL/frozen_2026-02-20.db
+Total bars: 71619
+Total esc:  ERROR
+Diff (bars - esc): 71619
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== ADAUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/ADAUSD/frozen_2026-02-21.db
+Total bars: 280944
+Total esc:  ERROR
+Diff (bars - esc): 280944
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== AMZN - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/AMZN/frozen_2026-02-20.db
+Total bars: 66543
+Total esc:  ERROR
+Diff (bars - esc): 66543
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== AUDUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/AUDUSD/frozen_2026-02-21.db
+Total bars: 214361
+Total esc:  ERROR
+Diff (bars - esc): 214361
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== AVAXUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/AVAXUSD/frozen_2026-02-21.db
+Total bars: 234250
+Total esc:  ERROR
+Diff (bars - esc): 234250
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== BNBUSD - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/BNBUSD/frozen_2026-02-20.db
+Total bars: 281030
+Total esc:  ERROR
+Diff (bars - esc): 281030
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== BND - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/BND/frozen_2026-02-21.db
+Total bars: 58354
+Total esc:  ERROR
+Diff (bars - esc): 58354
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== BTCUSD - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/BTCUSD/frozen_2026-02-20.db
+Total bars: 223633
+Total esc:  ERROR
+Diff (bars - esc): 223633
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== DIA - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/DIA/frozen_2026-02-20.db
+Total bars: 61369
+Total esc:  ERROR
+Diff (bars - esc): 61369
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== DOGEUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/DOGEUSD/frozen_2026-02-21.db
+Total bars: 205932
+Total esc:  ERROR
+Diff (bars - esc): 205932
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== EEM - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/EEM/frozen_2026-02-20.db
+Total bars: 58226
+Total esc:  ERROR
+Diff (bars - esc): 58226
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== EFA - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/EFA/frozen_2026-02-20.db
+Total bars: 60187
+Total esc:  ERROR
+Diff (bars - esc): 60187
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== EMB - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/EMB/frozen_2026-02-21.db
+Total bars: 58130
+Total esc:  ERROR
+Diff (bars - esc): 58130
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== ETHUSD - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/ETHUSD/frozen_2026-02-20.db
+Total bars: 205875
+Total esc:  ERROR
+Diff (bars - esc): 205875
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== EURUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/EURUSD/frozen_2026-02-21.db
+Total bars: 206329
+Total esc:  ERROR
+Diff (bars - esc): 206329
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== EWA - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/EWA/frozen_2026-02-20.db
+Total bars: 58164
+Total esc:  ERROR
+Diff (bars - esc): 58164
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== EWJ - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/EWJ/frozen_2026-02-20.db
+Total bars: 61709
+Total esc:  ERROR
+Diff (bars - esc): 61709
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== EWZ - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/EWZ/frozen_2026-02-20.db
+Total bars: 60503
+Total esc:  ERROR
+Diff (bars - esc): 60503
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== EZU - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/EZU/frozen_2026-02-20.db
+Total bars: 60434
+Total esc:  ERROR
+Diff (bars - esc): 60434
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== FXI - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/FXI/frozen_2026-02-21.db
+Total bars: 59278
+Total esc:  ERROR
+Diff (bars - esc): 59278
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== GBPUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/GBPUSD/frozen_2026-02-21.db
+Total bars: 206573
+Total esc:  ERROR
+Diff (bars - esc): 206573
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== GOOGL - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/GOOGL/frozen_2026-02-20.db
+Total bars: 64455
+Total esc:  ERROR
+Diff (bars - esc): 64455
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== HGUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/HGUSD/frozen_2026-02-21.db
+Total bars: 13286
+Total esc:  ERROR
+Diff (bars - esc): 13286
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== HYG - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/HYG/frozen_2026-02-21.db
+Total bars: 58413
+Total esc:  ERROR
+Diff (bars - esc): 58413
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== IEF - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/IEF/frozen_2026-02-21.db
+Total bars: 59772
+Total esc:  ERROR
+Diff (bars - esc): 59772
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== IGOV - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/IGOV/frozen_2026-02-21.db
+Total bars: 54238
+Total esc:  ERROR
+Diff (bars - esc): 54238
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== IWM - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/IWM/frozen_2026-02-20.db
+Total bars: 60439
+Total esc:  ERROR
+Diff (bars - esc): 60439
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== LINKUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/LINKUSD/frozen_2026-02-21.db
+Total bars: 280095
+Total esc:  ERROR
+Diff (bars - esc): 280095
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== LQD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/LQD/frozen_2026-02-21.db
+Total bars: 59805
+Total esc:  ERROR
+Diff (bars - esc): 59805
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== META - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/META/frozen_2026-02-20.db
+Total bars: 62182
+Total esc:  ERROR
+Diff (bars - esc): 62182
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== MSFT - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/MSFT/frozen_2026-02-20.db
+Total bars: 71131
+Total esc:  ERROR
+Diff (bars - esc): 71131
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== NGUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/NGUSD/frozen_2026-02-21.db
+Total bars: 52788
+Total esc:  ERROR
+Diff (bars - esc): 52788
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== NVDA - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/NVDA/frozen_2026-02-20.db
+Total bars: 66276
+Total esc:  ERROR
+Diff (bars - esc): 66276
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== QQQ - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/QQQ/frozen_2026-02-20.db
+Total bars: 60940
+Total esc:  ERROR
+Diff (bars - esc): 60940
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== SOLUSD - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/SOLUSD/frozen_2026-02-20.db
+Total bars: 205772
+Total esc:  ERROR
+Diff (bars - esc): 205772
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== SPY - 2026-02-19 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/SPY/frozen_2026-02-19.db
+Total bars: 62756
+Total esc:  62601
+Diff (bars - esc): 155
+latest_state rows: 5
+Timeframe breakdowns:
+tbl     timeframe  n    
+------  ---------  -----
+bars    15min      39122
+bars    1day       8321 
+bars    1h         10549
+bars    1week      1726 
+bars    4h         3038 
+esc     15min      39091
+esc     1day       8290 
+esc     1h         10518
+esc     1week      1695 
+esc     4h         3007 
+latest  15min      1    
+latest  1day       1    
+latest  1h         1    
+latest  1week      1    
+latest  4h         1    
+Bars date range:
+Esc asof range:
+15min|2020-02-11T10:45:00|2026-02-18T15:45:00
+1day|1993-03-16T00:00:00|2026-02-18T00:00:00
+1h|2020-02-19T14:00:00|2026-02-18T15:30:00
+1week|1993-08-30T00:00:00|2026-02-16T00:00:00
+4h|2020-02-27T07:00:00|2026-02-18T13:30:00
+STATUS: COMPLETE (looks good, diff in expected range)
+
+------------------------------------------
+
+=== TLT - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/TLT/frozen_2026-02-21.db
+Total bars: 59882
+Total esc:  ERROR
+Diff (bars - esc): 59882
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== TONUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/TONUSD/frozen_2026-02-21.db
+Total bars: 116727
+Total esc:  ERROR
+Diff (bars - esc): 116727
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== TSLA - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/TSLA/frozen_2026-02-20.db
+Total bars: 62773
+Total esc:  ERROR
+Diff (bars - esc): 62773
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== USDCAD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/USDCAD/frozen_2026-02-21.db
+Total bars: 213547
+Total esc:  ERROR
+Diff (bars - esc): 213547
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== USDJPY - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/USDJPY/frozen_2026-02-21.db
+Total bars: 211229
+Total esc:  ERROR
+Diff (bars - esc): 211229
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== VNQ - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/VNQ/frozen_2026-02-21.db
+Total bars: 59178
+Total esc:  ERROR
+Diff (bars - esc): 59178
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== VNQI - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/VNQI/frozen_2026-02-21.db
+Total bars: 57243
+Total esc:  ERROR
+Diff (bars - esc): 57243
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== WTIUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/WTIUSD/frozen_2026-02-21.db
+Total bars: 179459
+Total esc:  ERROR
+Diff (bars - esc): 179459
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== XAGUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/XAGUSD/frozen_2026-02-21.db
+Total bars: 203933
+Total esc:  ERROR
+Diff (bars - esc): 203933
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== XAUUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/XAUUSD/frozen_2026-02-21.db
+Total bars: 208838
+Total esc:  ERROR
+Diff (bars - esc): 208838
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== XBRUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/XBRUSD/frozen_2026-02-21.db
+Total bars: 186464
+Total esc:  ERROR
+Diff (bars - esc): 186464
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== XPTUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/XPTUSD/frozen_2026-02-21.db
+Total bars: 196883
+Total esc:  ERROR
+Diff (bars - esc): 196883
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== XRPUSD - 2026-02-20 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/XRPUSD/frozen_2026-02-20.db
+Total bars: 281017
+Total esc:  ERROR
+Diff (bars - esc): 281017
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+
+=== ZCUSD - 2026-02-21 ===
+DB path: /Users/sherifsaad/Documents/regime-engine/data/assets/ZCUSD/frozen_2026-02-21.db
+Total bars: 46749
+Total esc:  ERROR
+Diff (bars - esc): 46749
+latest_state rows: ERROR
+Timeframe breakdowns:
+  (query failed - tables missing?)
+Bars date range:
+Esc asof range:
+./audit_frozen.sh: line 71: [: ERROR: integer expression expected
+STATUS: INCOMPLETE or ERROR (check tables/queries)
+
+------------------------------------------
+

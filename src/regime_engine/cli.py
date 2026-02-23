@@ -26,6 +26,8 @@ def _trend_to_float(trend: str | float, rising: str, falling: str) -> float:
 from regime_engine.escalation_buckets import compute_bucket_from_percentile
 from regime_engine.escalation_v2 import rolling_percentile_transform
 from regime_engine.escalation_v2 import compute_escalation_v2
+from regime_engine.escalation_v2 import compute_escalation_v2_series
+from regime_engine.escalation_fast import compute_dsr_iix_ss_arrays_fast
 from regime_engine.features import (
     compute_ema,
     compute_returns,
@@ -214,18 +216,9 @@ def compute_market_state_from_df(
         "classification": classification,
     }
 
-    # --- Escalation v2 (tail composite): requires arrays, so build via loop when requested ---
+    # --- Escalation v2 (tail composite): fast path with precomputed series ---
     if include_escalation_v2 and len(df) >= 20:
-        dsr_arr, iix_arr, ss_arr = [], [], []
-        for i in range(20, len(df)):
-            sub = df.iloc[: i + 1]
-            out_sub = compute_market_state_from_df(
-                sub, symbol, diagnostics=diagnostics, include_escalation_v2=False
-            )
-            m = out_sub["metrics"]
-            dsr_arr.append(m["downside_shock_risk"])
-            iix_arr.append(m["instability_index"])
-            ss_arr.append(m["structural_score"])
+        dsr_arr, iix_arr, ss_arr = compute_dsr_iix_ss_arrays_fast(df, symbol)
         close_arr = close.iloc[20:].astype(float).values
         ema_arr = ema_slow.iloc[20:].astype(float).values
         escalation_v2, esc_parts = compute_escalation_v2(
@@ -237,18 +230,18 @@ def compute_market_state_from_df(
         )
         output["escalation_v2"] = float(escalation_v2)
 
-        # Build escalation_v2 series for percentile transform
-        escalation_v2_list = []
-        for i in range(31, len(df)):
-            n_bars = i - 19
-            dsr_a = np.array(dsr_arr[:n_bars], dtype=float)
-            iix_a = np.array(iix_arr[:n_bars], dtype=float)
-            ss_a = np.array(ss_arr[:n_bars], dtype=float)
-            close_a = close.iloc[20 : i + 1].astype(float).values
-            ema_a = ema_slow.iloc[20 : i + 1].astype(float).values
-            esc, _ = compute_escalation_v2(dsr_a, iix_a, ss_a, close_a, ema_a)
-            escalation_v2_list.append(float(esc))
-        esc_v2_series = pd.Series([float("nan")] * 31 + escalation_v2_list)
+        # Build escalation_v2 series via vectorized compute_escalation_v2_series
+        esc_full = compute_escalation_v2_series(
+            dsr_arr, iix_arr, ss_arr, close_arr, ema_arr
+        )
+        # First valid escalation at bar 31 (w_max-1 = 11 in 0-based close_arr)
+        w_max = max(10, 5, 10, 5) + 2  # 12
+        n_esc = max(0, len(df) - 31)
+        esc_vals = list(esc_full[w_max - 1 : w_max - 1 + n_esc]) if n_esc > 0 else []
+        esc_v2_series = pd.Series(
+            [float("nan")] * min(31, len(df)) + esc_vals,
+            index=df.index,
+        )
         esc_v2_pct_series = rolling_percentile_transform(esc_v2_series, window=504)
         escalation_v2_pct_today = esc_v2_pct_series.iloc[-1] if len(esc_v2_pct_series) else float("nan")
 

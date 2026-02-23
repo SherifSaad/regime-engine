@@ -276,10 +276,11 @@ ASSETS = {
     "QQQ":  {"path": "data/qqq_clean.csv",    "symbol": "QQQ",    "trading_days": 252},
     "NVDA": {"path": "data/nvda_clean.csv",   "symbol": "NVDA",   "trading_days": 252},
     "BTC":  {"path": "data/btcusd_clean.csv", "symbol": "BTCUSD", "trading_days": 365},
+    "XAU":  {"path": "data/xauusd_clean.csv", "symbol": "XAUUSD", "trading_days": 252},
 }
 
-# Run subset (SPY + BTC for baseline + extreme)
-RUN_ASSETS = ["SPY", "BTC"]
+# Run subset (SPY + BTC for baseline + extreme; add XAU for gold)
+RUN_ASSETS = ["SPY", "BTC", "XAU"]
 
 
 def _build_base_from_engine(engine_df: pd.DataFrame, trading_days: int = 252) -> pd.DataFrame:

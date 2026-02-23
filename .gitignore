@@ -1,15 +1,44 @@
-__pycache__/
-*.py[cod]
-*.so
-*.dylib
-.DS_Store
-.env
+# --- Python / venv ---
 .venv/
-venv/
-build/
-dist/
-*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 .pytest_cache/
-.coverage
-htmlcov/
-data/*.csv
+.mypy_cache/
+.ruff_cache/
+
+# --- macOS ---
+.DS_Store
+
+# --- Streamlit / app local ---
+.streamlit/
+
+# --- Data & databases (DO NOT COMMIT) ---
+data/
+validation_outputs/
+tmp_compute/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# --- Archives / bundles ---
+*.zip
+*.tar
+*.tar.gz
+*.7z
+
+# --- Secrets / keys ---
+*.pem
+*.key
+*.env
+.env*
+secrets/
+**/secrets/
+data/spy-c7g-key-2026.pem
+
+# --- Spreadsheets / misc local ---
+*.xlsx
+~$*.xlsx

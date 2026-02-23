@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Regime Engine — SPY UI Mockup</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --calm: #3fb950;
+      --elevated: #d29922;
+      --high: #f85149;
+      --critical: #da3633;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: 'SF Mono', 'Consolas', monospace; background: var(--bg); color: var(--text); margin: 0; padding: 24px; font-size: 13px; }
+    .nav-row { display: flex; gap: 16px; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+    select { background: var(--surface); color: var(--text); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+    .page-tabs { display: flex; gap: 8px; }
+    .page-tab { padding: 8px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+    .page-tab.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+    .page { display: none; }
+    .page.active { display: block; }
+    .header-block { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-bottom: 24px; }
+    .header-block h1 { margin: 0 0 16px 0; font-size: 20px; }
+    .header-metrics { display: flex; gap: 32px; flex-wrap: wrap; }
+    .metric { }
+    .metric-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .metric-value { font-size: 24px; font-weight: 600; }
+    .metric-value.calm { color: var(--calm); }
+    .metric-value.elevated { color: var(--elevated); }
+    .metric-value.high { color: var(--high); }
+    .metric-value.critical { color: var(--critical); }
+    .tf-tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+    .tf-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+    .tf-tile h3 { margin: 0 0 8px 0; font-size: 14px; }
+    .tf-tile .pctl { font-size: 18px; font-weight: 600; }
+    .tf-tile .bucket { font-size: 11px; color: var(--muted); margin: 4px 0; }
+    .tf-tile .sparkline { height: 24px; background: #0d1117; border-radius: 4px; margin-top: 8px; }
+    .chart-block { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-bottom: 24px; min-height: 320px; }
+    .chart-placeholder { background: #0d1117; border-radius: 6px; height: 280px; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+    .stats-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+    .stats-panel h4 { margin: 0 0 12px 0; font-size: 12px; color: var(--muted); }
+    .stats-panel ul { margin: 0; padding-left: 18px; }
+    .stats-panel li { margin: 6px 0; }
+    .two-col { display: grid; grid-template-columns: 1fr 320px; gap: 24px; }
+    .tf-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tf-tab { padding: 6px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .tf-tab.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+    .toggle-row { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; font-size: 12px; }
+    .toggle-row label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .validation-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .validation-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+    .validation-card h4 { margin: 0 0 12px 0; font-size: 12px; color: var(--muted); }
+    .validation-card .value { font-size: 20px; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <!-- Top nav: asset class → asset -->
+  <div class="nav-row">
+    <span style="color: var(--muted);">Asset class</span>
+    <select id="assetClass">
+      <option>Equities</option>
+      <option>ETFs</option>
+      <option>Futures</option>
+    </select>
+    <span style="color: var(--muted);">Asset</span>
+    <select id="asset">
+      <option>SPY</option>
+      <option>QQQ</option>
+      <option>AAPL</option>
+      <option>MSFT</option>
+    </select>
+    <span style="margin-left: auto; color: var(--muted);">Regime Engine</span>
+  </div>
+
+  <!-- Page tabs -->
+  <div class="page-tabs">
+    <div class="page-tab active" data-page="overview">1. Overview</div>
+    <div class="page-tab" data-page="drilldown">2. Timeframe Drilldown</div>
+    <div class="page-tab" data-page="era">3. Era View</div>
+    <div class="page-tab" data-page="validation">4. Validation Panel</div>
+  </div>
+
+  <!-- Page 1: Overview -->
+  <div id="page-overview" class="page active">
+    <div class="header-block">
+      <h1>SPY — Overview</h1>
+      <div class="header-metrics">
+        <div class="metric">
+          <div class="metric-label">As of</div>
+          <div class="metric-value">2025-02-17 16:00 UTC</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Hazard Score</div>
+          <div class="metric-value elevated">42</div>
+          <div class="metric-label">Elevated</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Cross-TF Consensus</div>
+          <div class="metric-value">0.78</div>
+          <div class="metric-label">4/5 TFs elevated</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tf-tiles">
+      <div class="tf-tile">
+        <h3>15m</h3>
+        <div class="pctl">0.72</div>
+        <div class="bucket">elevated</div>
+        <div class="sparkline" title="last N percentiles"></div>
+        <div class="metric-label">—</div>
+      </div>
+      <div class="tf-tile">
+        <h3>1h</h3>
+        <div class="pctl">0.81</div>
+        <div class="bucket">high</div>
+        <div class="sparkline"></div>
+        <div class="metric-label">—</div>
+      </div>
+      <div class="tf-tile">
+        <h3>4h</h3>
+        <div class="pctl">0.65</div>
+        <div class="bucket">elevated</div>
+        <div class="sparkline"></div>
+        <div class="metric-label">event 2d ago</div>
+      </div>
+      <div class="tf-tile">
+        <h3>1D</h3>
+        <div class="pctl">0.88</div>
+        <div class="bucket">high</div>
+        <div class="sparkline"></div>
+        <div class="metric-label">—</div>
+      </div>
+      <div class="tf-tile">
+        <h3>1W</h3>
+        <div class="pctl">0.91</div>
+        <div class="bucket">critical</div>
+        <div class="sparkline"></div>
+        <div class="metric-label">event 1w ago</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page 2: Timeframe Drilldown -->
+  <div id="page-drilldown" class="page">
+    <div class="header-block">
+      <h1>SPY — Timeframe Drilldown</h1>
+    </div>
+    <div class="tf-tabs">
+      <span class="tf-tab active">15m</span>
+      <span class="tf-tab">1h</span>
+      <span class="tf-tab">4h</span>
+      <span class="tf-tab">1D</span>
+      <span class="tf-tab">1W</span>
+    </div>
+    <div class="toggle-row">
+      <label><input type="checkbox"> esc_pctl_504 (canonical)</label>
+      <label><input type="checkbox"> esc_pctl_252</label>
+      <label><input type="checkbox"> esc_pctl_1260</label>
+      <span style="color: var(--muted);">(1D/1W only)</span>
+    </div>
+    <div class="two-col">
+      <div class="chart-block">
+        <div style="margin-bottom: 12px; font-size: 12px; color: var(--muted);">Main line: esc_pctl_504 · Background: esc_bucket · Dots: event_flag=1 (colored by severity)</div>
+        <div class="chart-placeholder">[Chart: esc_pctl_504 line, bucket shading, event markers]</div>
+      </div>
+      <div class="stats-panel">
+        <h4>Right-side stats</h4>
+        <ul>
+          <li>In the last 12 months: <strong>18%</strong> time above 0.95</li>
+          <li>Conditional stress rate: P(event within 20 bars | pctl ≥ 0.95) = <strong>0.32</strong></li>
+        </ul>
+        <h4 style="margin-top: 16px;">Last 5 events</h4>
+        <ul>
+          <li>2025-02-14 — MILD — fwd_absret_h: 0.012</li>
+          <li>2025-02-10 — MODERATE — 0.028</li>
+          <li>2025-02-03 — MILD — 0.009</li>
+          <li>2025-01-27 — HIGH — 0.041</li>
+          <li>2025-01-20 — MILD — 0.011</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page 3: Era View -->
+  <div id="page-era" class="page">
+    <div class="header-block">
+      <h1>SPY — Era View</h1>
+      <div class="metric-label" style="margin-bottom: 8px;">Structural eras prestige narrative</div>
+    </div>
+    <div class="toggle-row">
+      <label><input type="radio" name="era-toggle" checked> esc_pctl_504</label>
+      <label><input type="radio" name="era-toggle"> esc_pctl_era</label>
+    </div>
+    <div class="chart-block">
+      <div style="margin-bottom: 12px; font-size: 12px; color: var(--muted);">Toggle: canonical vs era-adjusted percentile</div>
+      <div class="chart-placeholder">[Chart: esc_pctl_504 vs esc_pctl_era]</div>
+    </div>
+    <div class="stats-panel" style="margin-top: 16px;">
+      <h4>Summary: how often "high escalation" led to events in each era</h4>
+      <ul>
+        <li>2018–2020: 12 events, 8 when pctl ≥ 0.9</li>
+        <li>2020–2022: 18 events, 14 when pctl ≥ 0.9</li>
+        <li>2022–2024: 9 events, 6 when pctl ≥ 0.9</li>
+        <li>2024–now: 5 events, 4 when pctl ≥ 0.9</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Page 4: Validation Panel -->
+  <div id="page-validation" class="page">
+    <div class="header-block">
+      <h1>SPY — Validation Panel</h1>
+      <div class="metric-label">Internal / advanced — not marketing, just truth</div>
+    </div>
+    <div class="validation-grid">
+      <div class="validation-card">
+        <h4>Hit rate</h4>
+        <div class="value">0.68</div>
+        <div class="metric-label">Wilson: [0.61, 0.74]</div>
+      </div>
+      <div class="validation-card">
+        <h4>Lift vs baseline</h4>
+        <div class="value">1.42x</div>
+        <div class="metric-label">events captured above p95</div>
+      </div>
+      <div class="validation-card">
+        <h4>Counts by severity</h4>
+        <div class="value">M: 45 · Mod: 22 · H: 8 · C: 2</div>
+        <div class="metric-label">MILD, MODERATE, HIGH, CRISIS</div>
+      </div>
+    </div>
+    <div style="margin-top: 24px; font-size: 12px; color: var(--muted);">Export buttons (later)</div>
+  </div>
+
+  <script>
+    document.querySelectorAll('.page-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('page-' + tab.dataset.page).classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>
