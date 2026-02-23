@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import sqlite3
+import sys
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -368,11 +369,11 @@ def load_universe() -> Dict:
     return json.load(open("data/assets/universe_final.json"))
 
 
-def resolve_provider_symbol(universe: Dict, symbol: str) -> str:
+def resolve_provider_symbol(universe: Dict, symbol: str) -> Optional[str]:
     for a in universe["assets"]:
         if a["symbol"] == symbol:
             return a["provider_symbol"]
-    raise RuntimeError(f"Symbol not found in universe_final.json: {symbol}")
+    return None
 
 
 def write_inventory(symbol: str, conn: sqlite3.Connection) -> None:
@@ -399,22 +400,41 @@ def main():
     universe = load_universe()
     provider_symbol = resolve_provider_symbol(universe, symbol)
 
+    if provider_symbol is None:
+        print(f"SKIP {symbol}: not found in universe_final.json")
+        sys.exit(0)
+
+    try:
+        _ = call_earliest(provider_symbol, TIMEFRAMES[0])
+    except (RuntimeError, requests.RequestException) as e:
+        msg = str(e)
+        short = msg[:80] + "..." if len(msg) > 80 else msg
+        print(f"SKIP {symbol}: provider error {short}")
+        sys.exit(0)
+
     db = live_db_path(symbol)
     print("DB:", db)
     conn = connect(db)
     ensure_schema(conn)
 
-    for tf in TIMEFRAMES:
-        ensure_cursor_row(conn, symbol, tf)
-        earliest = call_earliest(provider_symbol, tf)
-        if tf in INTRADAY_BACKWARD:
-            backfill_backward(conn, symbol, provider_symbol, tf, earliest)
-        else:
-            backfill_forward(conn, symbol, provider_symbol, tf, earliest)
+    try:
+        for tf in TIMEFRAMES:
+            ensure_cursor_row(conn, symbol, tf)
+            earliest = call_earliest(provider_symbol, tf)
+            if tf in INTRADAY_BACKWARD:
+                backfill_backward(conn, symbol, provider_symbol, tf, earliest)
+            else:
+                backfill_forward(conn, symbol, provider_symbol, tf, earliest)
 
-    write_inventory(symbol, conn)
-    conn.close()
-    print(f"\nDONE: {symbol} full backfill complete (or skipped where already complete).")
+        write_inventory(symbol, conn)
+        conn.close()
+        print(f"\nDONE: {symbol} full backfill complete (or skipped where already complete).")
+    except (RuntimeError, requests.RequestException) as e:
+        msg = str(e)
+        short = msg[:80] + "..." if len(msg) > 80 else msg
+        print(f"SKIP {symbol}: provider error {short}")
+        conn.close()
+        sys.exit(0)
 
 
 if __name__ == "__main__":
