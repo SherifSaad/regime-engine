@@ -6,11 +6,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]  # core/providers/ → root
+BARS_ROOT = PROJECT_ROOT / "data" / "bars"
+
 
 class BarsProvider:
     """Abstract data access layer for bars – compute never touches files directly."""
 
-    ROOT = Path("data/bars")
+    ROOT = BARS_ROOT
 
     @staticmethod
     def _ensure_dir(path: Path) -> None:
