@@ -22,6 +22,7 @@ import sqlite3
 import requests
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -41,7 +42,11 @@ load_dotenv()
 TIMEFRAMES = ["15min", "1h", "4h", "1day", "1week"]
 TD_TS_URL = "https://api.twelvedata.com/time_series"
 
-DEFAULT_DB_PATH = "/Users/sherifsaad/Documents/regime-engine/data/regime_cache.db"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_DB_PATH = str(PROJECT_ROOT / "data" / "regime_cache.db")
+
+# Earnings tier: daily + weekly only
+EARNINGS_TIMEFRAMES = ["1day", "1week"]
 
 # Overlap refetch (idempotent inserts make this safe)
 OVERLAP_BARS = 5
@@ -169,6 +174,85 @@ def insert_bars(conn: sqlite3.Connection, symbol: str, tf: str, values: List[Dic
             max_ts = ts
 
     return inserted, max_ts
+
+
+def live_db_path(symbol: str) -> Path:
+    """Per-asset live.db path (pipeline storage)."""
+    return PROJECT_ROOT / "data" / "assets" / symbol / "live.db"
+
+
+def ensure_live_db_schema(conn: sqlite3.Connection) -> None:
+    """Ensure per-asset live.db has bars and fetch_cursor tables."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS bars(
+            symbol TEXT NOT NULL,
+            timeframe TEXT NOT NULL,
+            ts TEXT NOT NULL,
+            open REAL,
+            high REAL,
+            low REAL,
+            close REAL,
+            volume REAL,
+            source TEXT DEFAULT 'twelvedata',
+            PRIMARY KEY(symbol, timeframe, ts)
+        );
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS fetch_cursor(
+            symbol TEXT NOT NULL,
+            timeframe TEXT NOT NULL,
+            last_ts TEXT,
+            PRIMARY KEY(symbol, timeframe)
+        );
+        """
+    )
+    conn.commit()
+
+
+def fetch_earnings_daily_weekly(symbol: str, provider_symbol: str) -> Tuple[int, Optional[str]]:
+    """
+    Fetch daily + weekly bars for earnings tier. Writes to per-asset live.db.
+    Returns (inserted_total, error_msg). error_msg is None on success.
+    """
+    path = live_db_path(symbol)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(path))
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+    ensure_live_db_schema(conn)
+
+    total = 0
+    try:
+        for tf in EARNINGS_TIMEFRAMES:
+            ensure_cursor_row(conn, symbol, tf)
+            start_date = get_nth_last_ts(conn, symbol, tf, OVERLAP_BARS)
+
+            try:
+                values = td_time_series(provider_symbol, tf, start_date=start_date)
+            except RuntimeError as e:
+                if str(e) == "RATE_LIMIT":
+                    time.sleep(RATE_LIMIT_SLEEP)
+                    values = td_time_series(provider_symbol, tf, start_date=start_date)
+                else:
+                    raise
+
+            if not values:
+                continue
+
+            inserted, _ = insert_bars(conn, symbol, tf, values, source="twelvedata")
+            conn.commit()
+            set_cursor_max(conn, symbol, tf)
+            conn.commit()
+            total += inserted
+    except Exception as e:
+        conn.close()
+        return total, str(e)
+    conn.close()
+    return total, None
+
 
 # ----------------------------
 # Fetch
@@ -365,16 +449,19 @@ def main():
 
             # Isolated earnings/daily tier — failures here never affect real-time
             try:
-                daily_symbols = [a["symbol"] for a in daily_assets()]
-                if daily_symbols:
-                    print(f"Starting earnings/daily update for {len(daily_symbols)} symbols")
-                    for symbol in daily_symbols:
+                daily_list = daily_assets()
+                if daily_list:
+                    print(f"Starting earnings/daily update for {len(daily_list)} symbols")
+                    for asset in daily_list:
+                        symbol = asset["symbol"]
+                        provider_symbol = asset.get("provider_symbol") or symbol
                         try:
-                            # Minimal placeholder – replace with actual fetch/append logic later
-                            print(f"  Updating daily bars for {symbol} (placeholder)")
-                            # Example future call:
-                            # fetch_and_append_daily_weekly_bars(symbol)
-                            # compute_daily_regime(symbol)
+                            print(f"  Fetching daily/weekly bars for {symbol}")
+                            inserted, err = fetch_earnings_daily_weekly(symbol, provider_symbol)
+                            if err:
+                                print(f"  Error updating {symbol}: {err}")
+                            else:
+                                print(f"  Success: updated {symbol} (inserted={inserted})")
                         except Exception as e:
                             print(f"  Error updating {symbol}: {e}")
                     print("Earnings/daily update complete")
