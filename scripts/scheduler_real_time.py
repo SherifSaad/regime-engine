@@ -27,6 +27,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
+from threading import Thread
 from typing import Dict, List, Optional, Tuple
 
 import requests
@@ -49,6 +50,7 @@ from core.compute.regime_engine_polars import (
 )
 from core.asset_class_rules import should_poll
 from core.providers.bars_provider import BarsProvider
+from core.utils.config_watcher import check_and_clear_universe_changed, start_universe_watcher
 
 # ----------------------------
 # Env / Config
@@ -343,6 +345,10 @@ def main():
     db = db_path()
     os.makedirs(os.path.dirname(db), exist_ok=True)
 
+    # Start universe.json watcher in background
+    watcher_thread = Thread(target=start_universe_watcher, daemon=True)
+    watcher_thread.start()
+
     real_time_list = real_time_assets()
     real_time_symbols = [a["symbol"] for a in real_time_list]
     print("DB:", db)
@@ -359,6 +365,12 @@ def main():
 
     while True:
         try:
+            # Reload universe if universe.json changed
+            if check_and_clear_universe_changed():
+                real_time_list = real_time_assets()
+                real_time_symbols = [a["symbol"] for a in real_time_list]
+                print(f"[CONFIG] Reloaded universe: {len(real_time_symbols)} symbols: {real_time_symbols}\n")
+
             now_est = datetime.now(ZoneInfo("America/New_York"))
             is_us_trading_day = now_est.weekday() < 5
             is_us_trading_hours = 9 <= now_est.hour < 16

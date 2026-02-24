@@ -19,6 +19,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from threading import Thread
 from typing import Dict, List, Optional, Tuple
 
 import polars as pl
@@ -37,6 +38,7 @@ from core.compute.regime_engine_polars import (
 )
 from core.providers.bars_provider import BarsProvider
 from core.storage import get_conn, init_db
+from core.utils.config_watcher import start_universe_watcher
 
 # ----------------------------
 # Env / Config
@@ -278,6 +280,10 @@ def compute_and_persist_earnings_symbol(conn, symbol: str, lookback: int) -> Non
 # ----------------------------
 
 def main():
+    # Start universe.json watcher in background (for long-running or repeated runs)
+    watcher_thread = Thread(target=start_universe_watcher, daemon=True)
+    watcher_thread.start()
+
     daily_list = daily_assets()
     print(f"Earnings daily run – processing {len(daily_list)} symbols")
 
