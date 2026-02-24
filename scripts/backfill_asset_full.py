@@ -1,28 +1,22 @@
-"""
-Generic full backfill for ONE asset from Twelve Data into the per-asset SQLite DB.
+"""Full backfill for real-time core symbols from Twelve Data into per-asset SQLite DB.
 
-- Reads universe from: data/assets/universe_final.json
+- Reads assets from universe.json via core.assets_registry.real_time_assets()
 - Uses provider_symbol (e.g., "EUR/USD", "BTC/USD") for Twelve Data calls
 - Writes to: data/assets/{SYMBOL}/live.db
 - Canonical timeframes: 15min, 1h, 4h, 1day, 1week
 - Idempotent inserts into bars (PRIMARY KEY symbol,timeframe,ts)
 
 Important:
-- Twelve Data outputsize is capped (5000). For intraday, forward paging with start_date
-  can stall at the most recent 5000 bars for some symbols.
-- So:
-    * 15min + 1h use BACKWARD paging via end_date + order=DESC until earliest_timestamp reached.
-    * 4h/1day/1week use forward paging via start_date + order=ASC.
+- Twelve Data outputsize is capped (5000). Forward paging can stall at the most recent 5000 bars.
+- So: 15min, 1h, 4h, 1day use BACKWARD paging (end_date + order=DESC). 1week uses forward (start_date + ASC).
 
 Run:
-  python scripts/backfill_asset_full.py --symbol QQQ
+  python scripts/backfill_asset_full.py
 """
 
-import argparse
 import json
 import os
 import sqlite3
-import sys
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -30,8 +24,11 @@ from typing import Dict, List, Optional, Tuple
 import requests
 from dotenv import load_dotenv
 
+from core.assets_registry import real_time_assets
+
 load_dotenv()
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 TD_EARLIEST_URL = "https://api.twelvedata.com/earliest_timestamp"
 TD_TS_URL = "https://api.twelvedata.com/time_series"
 
@@ -73,7 +70,7 @@ def td_get(url: str, params: dict, timeout: int = 30, max_retries: int = 10):
 
 
 def asset_dir(symbol: str) -> Path:
-    return Path("data/assets") / symbol
+    return PROJECT_ROOT / "data" / "assets" / symbol
 
 
 def live_db_path(symbol: str) -> Path:
@@ -365,17 +362,6 @@ def backfill_backward(conn: sqlite3.Connection, symbol: str, provider_symbol: st
         time.sleep(SLEEP_BETWEEN_CALLS_SEC)
 
 
-def load_universe() -> Dict:
-    return json.load(open("data/assets/universe_final.json"))
-
-
-def resolve_provider_symbol(universe: Dict, symbol: str) -> Optional[str]:
-    for a in universe["assets"]:
-        if a["symbol"] == symbol:
-            return a["provider_symbol"]
-    return None
-
-
 def write_inventory(symbol: str, conn: sqlite3.Connection) -> None:
     inv = {
         "symbol": symbol,
@@ -392,49 +378,44 @@ def write_inventory(symbol: str, conn: sqlite3.Connection) -> None:
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--symbol", required=True, help="Canonical symbol folder, e.g. QQQ, EURUSD, BTCUSD")
-    args = ap.parse_args()
+    assets_to_backfill = real_time_assets()
+    symbols = [a["symbol"] for a in assets_to_backfill]
+    print(f"Backfilling {len(symbols)} real-time core symbols: {symbols}")
 
-    symbol = args.symbol.strip().upper()
-    universe = load_universe()
-    provider_symbol = resolve_provider_symbol(universe, symbol)
+    for asset in assets_to_backfill:
+        symbol = asset["symbol"]
+        provider_symbol = asset.get("provider_symbol") or symbol
 
-    if provider_symbol is None:
-        print(f"SKIP {symbol}: not found in universe_final.json")
-        sys.exit(0)
+        try:
+            _ = call_earliest(provider_symbol, TIMEFRAMES[0])
+        except (RuntimeError, requests.RequestException) as e:
+            msg = str(e)
+            short = msg[:80] + "..." if len(msg) > 80 else msg
+            print(f"SKIP {symbol}: provider error {short}")
+            continue
 
-    try:
-        _ = call_earliest(provider_symbol, TIMEFRAMES[0])
-    except (RuntimeError, requests.RequestException) as e:
-        msg = str(e)
-        short = msg[:80] + "..." if len(msg) > 80 else msg
-        print(f"SKIP {symbol}: provider error {short}")
-        sys.exit(0)
+        db = live_db_path(symbol)
+        print("\nDB:", db)
+        conn = connect(db)
+        ensure_schema(conn)
 
-    db = live_db_path(symbol)
-    print("DB:", db)
-    conn = connect(db)
-    ensure_schema(conn)
+        try:
+            for tf in TIMEFRAMES:
+                ensure_cursor_row(conn, symbol, tf)
+                earliest = call_earliest(provider_symbol, tf)
+                if tf in INTRADAY_BACKWARD:
+                    backfill_backward(conn, symbol, provider_symbol, tf, earliest)
+                else:
+                    backfill_forward(conn, symbol, provider_symbol, tf, earliest)
 
-    try:
-        for tf in TIMEFRAMES:
-            ensure_cursor_row(conn, symbol, tf)
-            earliest = call_earliest(provider_symbol, tf)
-            if tf in INTRADAY_BACKWARD:
-                backfill_backward(conn, symbol, provider_symbol, tf, earliest)
-            else:
-                backfill_forward(conn, symbol, provider_symbol, tf, earliest)
-
-        write_inventory(symbol, conn)
-        conn.close()
-        print(f"\nDONE: {symbol} full backfill complete (or skipped where already complete).")
-    except (RuntimeError, requests.RequestException) as e:
-        msg = str(e)
-        short = msg[:80] + "..." if len(msg) > 80 else msg
-        print(f"SKIP {symbol}: provider error {short}")
-        conn.close()
-        sys.exit(0)
+            write_inventory(symbol, conn)
+            conn.close()
+            print(f"\nDONE: {symbol} full backfill complete (or skipped where already complete).")
+        except (RuntimeError, requests.RequestException) as e:
+            msg = str(e)
+            short = msg[:80] + "..." if len(msg) > 80 else msg
+            print(f"SKIP {symbol}: provider error {short}")
+            conn.close()
 
 
 if __name__ == "__main__":
