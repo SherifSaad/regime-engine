@@ -36,7 +36,13 @@ from dotenv import load_dotenv
 from regime_engine.cli import compute_market_state_from_df
 
 from core.assets_registry import real_time_assets, LegacyAsset
-from core.compute.regime_engine_polars import compute_regime_polars
+from core.compute.regime_engine_polars import (
+    CODE_VERSION,
+    compute_regime_polars,
+    compute_regime_polars_incremental,
+    load_regime_cache,
+    persist_regime_cache,
+)
 from core.asset_class_rules import should_poll
 from core.providers.bars_provider import BarsProvider
 
@@ -270,7 +276,7 @@ def _polars_result_to_state(result_df: pl.DataFrame, symbol: str, tf: str) -> Op
 
 
 def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: int) -> None:
-    """Read bars from Parquet, compute state via Polars (fast), persist to regime_cache.db."""
+    """Read bars from Parquet, compute state via Polars (incremental + cache), persist to regime_cache.db."""
     for tf in TIMEFRAMES:
         latest_ts = get_latest_bar_ts_from_parquet(symbol, tf)
         if not latest_ts:
@@ -283,7 +289,41 @@ def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: 
                 continue
             pl_df = pl_df.sort("ts")  # ascending for rolling calcs
 
-            result_df = compute_regime_polars(pl_df)
+            n_rows = len(pl_df)
+            prev_result, prev_meta = load_regime_cache(symbol, tf)
+            cache_key = f"{latest_ts}_{n_rows}_{CODE_VERSION}"[:32]  # short fingerprint for log
+
+            # Cache hit: same last_ts, n_rows, code_version
+            if prev_meta and prev_result is not None:
+                if (
+                    prev_meta.get("last_bar_ts") == latest_ts
+                    and prev_meta.get("n_rows") == n_rows
+                    and prev_meta.get("code_version") == CODE_VERSION
+                ):
+                    result_df = prev_result
+                    state = _polars_result_to_state(result_df, symbol, tf)
+                    if state:
+                        asof = state.get("asof", latest_ts)
+                        upsert_latest_state(conn, symbol, tf, asof, state)
+                        insert_state_history(conn, symbol, tf, asof, state)
+                        conn.commit()
+                        print(f"[COMPUTE] {symbol} {tf}: cache hit asof={asof}")
+                        continue
+
+            # Compute: incremental if we have previous + new bars, else full
+            if prev_result is not None and not prev_result.is_empty():
+                prev_max_ts = prev_result["ts"].max()
+                new_bars = pl_df.filter(pl.col("ts") > prev_max_ts)
+                if len(new_bars) > 0 and len(pl_df) >= len(prev_result):
+                    result_df = compute_regime_polars_incremental(new_bars, prev_result, CODE_VERSION)
+                    print(f"[COMPUTE] {symbol} {tf}: incremental (+{len(new_bars)} bars)")
+                else:
+                    result_df = compute_regime_polars(pl_df)
+                    print(f"[COMPUTE] {symbol} {tf}: full recompute")
+            else:
+                result_df = compute_regime_polars(pl_df)
+                print(f"[COMPUTE] {symbol} {tf}: full compute")
+
             state = _polars_result_to_state(result_df, symbol, tf)
             if not state:
                 continue
@@ -292,7 +332,8 @@ def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: 
             upsert_latest_state(conn, symbol, tf, asof, state)
             insert_state_history(conn, symbol, tf, asof, state)
             conn.commit()
-            print(f"[COMPUTE] {symbol} {tf}: wrote asof={asof} (Polars)")
+            persist_regime_cache(symbol, tf, result_df, latest_ts, len(result_df), CODE_VERSION)
+            print(f"[COMPUTE] {symbol} {tf}: wrote asof={asof} cache_key={cache_key}")
         except Exception as e:
             print(f"[COMPUTE] {symbol} {tf}: Polars failed ({e}), falling back to legacy", file=sys.stderr)
             try:

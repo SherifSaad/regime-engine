@@ -6,11 +6,25 @@ Designed for: ~200k bars (crypto), 1500 earnings symbols, quick re-compute.
 
 Phase 6 Step 1: Initial implementation with core metrics. Expand to full 11-metric
 engine in later steps.
+Phase 6 Step 3: Incremental compute + deterministic caching.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
+import logging
+from pathlib import Path
+from typing import Optional
+
 import polars as pl
+
+logger = logging.getLogger(__name__)
+
+CODE_VERSION = "v1.0"
+WINDOW_MAX = 252  # max rolling window (drawdown_pressure)
+RAW_COLS = ["ts", "open", "high", "low", "close", "volume"]
+DERIVED_ROOT = Path(__file__).resolve().parents[2] / "data" / "derived"
 
 
 def _clip01(x: pl.Expr) -> pl.Expr:
@@ -138,3 +152,86 @@ def compute_regime_polars(df: pl.DataFrame) -> pl.DataFrame:
     ])
 
     return df
+
+
+def _cache_key(last_bar_ts: str, n_rows: int, code_version: str = CODE_VERSION) -> str:
+    """Deterministic cache key: input fingerprint + code version."""
+    payload = f"{last_bar_ts}_{n_rows}_{code_version}"
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _extract_raw(df: pl.DataFrame) -> pl.DataFrame:
+    """Extract raw OHLCV columns from result (for incremental context)."""
+    cols = [c for c in RAW_COLS if c in df.columns]
+    return df.select(cols)
+
+
+def compute_regime_polars_incremental(
+    df_new: pl.DataFrame,
+    previous_result: Optional[pl.DataFrame] = None,
+    code_version: str = CODE_VERSION,
+) -> pl.DataFrame:
+    """
+    Incremental compute: only recompute tail when appending new bars.
+    When previous_result is None, does full compute.
+    """
+    if previous_result is None or previous_result.is_empty():
+        return compute_regime_polars(df_new)
+
+    prev_raw = _extract_raw(previous_result)
+    full_bars = (
+        pl.concat([prev_raw, df_new])
+        .unique(subset="ts", keep="last")
+        .sort("ts")
+    )
+    n_new = len(df_new)
+    n_prev = len(previous_result)
+    start_idx = max(0, n_prev - WINDOW_MAX)
+    df_tail = full_bars.tail(WINDOW_MAX + n_new)
+    result_tail = compute_regime_polars(df_tail)
+    prefix = previous_result.head(start_idx)
+    result = pl.concat([prefix, result_tail])
+    return result
+
+
+def load_regime_cache(symbol: str, timeframe: str) -> tuple[Optional[pl.DataFrame], Optional[dict]]:
+    """
+    Load cached regime result and meta. Returns (result_df, meta_dict) or (None, None).
+    """
+    base = DERIVED_ROOT / symbol
+    result_path = base / f"{timeframe}_regime.parquet"
+    meta_path = base / f"{timeframe}_regime_meta.json"
+    if not result_path.exists() or not meta_path.exists():
+        return None, None
+    try:
+        result = pl.read_parquet(result_path)
+        meta = json.loads(meta_path.read_text())
+        return result, meta
+    except Exception as e:
+        logger.warning("Regime cache load failed: %s", e)
+        return None, None
+
+
+def persist_regime_cache(
+    symbol: str,
+    timeframe: str,
+    result_df: pl.DataFrame,
+    last_bar_ts: str,
+    n_rows: int,
+    code_version: str = CODE_VERSION,
+) -> None:
+    """Persist regime result and meta for cache lookup."""
+    base = DERIVED_ROOT / symbol
+    base.mkdir(parents=True, exist_ok=True)
+    result_path = base / f"{timeframe}_regime.parquet"
+    meta_path = base / f"{timeframe}_regime_meta.json"
+    result_df.write_parquet(result_path, compression="zstd")
+    cache_key = _cache_key(last_bar_ts, n_rows, code_version)
+    meta = {
+        "last_bar_ts": last_bar_ts,
+        "n_rows": n_rows,
+        "code_version": code_version,
+        "cache_key": cache_key,
+    }
+    meta_path.write_text(json.dumps(meta, separators=(",", ":")))
+    logger.debug("Regime cache persisted: %s %s cache_key=%s", symbol, timeframe, cache_key[:12])
