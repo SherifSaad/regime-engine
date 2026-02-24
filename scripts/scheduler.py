@@ -3,7 +3,7 @@
 Central Scheduler (Multi-Asset)
 
 Loop:
-  1) For each asset in core.assets_registry.default_assets():
+  1) For each asset in core.assets_registry.scheduler_assets():
        - for each timeframe: if should_poll(symbol, timeframe) is True:
            fetch incremental bars (overlap) -> insert into bars
   2) If ANY new bars inserted for a given symbol -> compute ALL 5 TF states for that symbol
@@ -29,7 +29,7 @@ from dotenv import load_dotenv
 
 from regime_engine.cli import compute_market_state_from_df
 
-from core.assets_registry import default_assets
+from core.assets_registry import scheduler_assets, LegacyAsset
 from core.asset_class_rules import should_poll
 
 # ----------------------------
@@ -316,10 +316,12 @@ def main():
     db = db_path()
     os.makedirs(os.path.dirname(db), exist_ok=True)
 
-    assets = default_assets()
+    enabled_assets = scheduler_assets()
+    assets = [LegacyAsset.from_dict(a) for a in enabled_assets]
+    symbols = [a.symbol for a in assets]
     print("DB:", db)
     print("LOOKBACK:", DEFAULT_LOOKBACK)
-    print("Assets:", ", ".join([a.symbol for a in assets]))
+    print(f"Scheduler running for {len(symbols)} enabled symbols: {symbols}")
     print("TFs:", ", ".join(TIMEFRAMES))
     print("Scheduler starting...\n")
 
