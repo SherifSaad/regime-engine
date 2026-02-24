@@ -4,11 +4,20 @@ from pathlib import Path
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 
+# Robust absolute path – works regardless of CWD
+PROJECT_ROOT = Path(__file__).resolve().parents[1]  # core/ is one level below root
+UNIVERSE_PATH = PROJECT_ROOT / "universe.json"
+
 
 def load_universe() -> List[Dict]:
-    with open("universe.json") as f:
+    """Load the canonical universe from absolute path."""
+    if not UNIVERSE_PATH.exists():
+        raise FileNotFoundError(f"Universe file not found at: {UNIVERSE_PATH}")
+
+    with open(UNIVERSE_PATH, encoding="utf-8") as f:
         data = json.load(f)
-    return [a for a in data["assets"] if a.get("active", True)]
+
+    return [a for a in data.get("assets", []) if a.get("active", True)]
 
 
 def _default_assets_symbols() -> List[str]:
