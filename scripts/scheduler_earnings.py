@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Earnings scheduler – daily/weekly bars for earnings tier symbols.
+Earnings scheduler – 1h + 1week bars for earnings tier symbols.
 
-Single run: fetch daily + weekly bars for all daily_assets(), write to per-asset live.db.
+Single run: fetch 1h and 1week bars for all daily_assets(), append to Parquet via BarsProvider.
 No RTH check – runs once per day (cron) or on demand.
+Only 1h and 1week (not 15min, 4h, 1d) for earnings assets.
 
 Notes:
 - TWELVEDATA_API_KEY required in .env
@@ -12,14 +13,15 @@ Notes:
 import os
 import sys
 import time
-import sqlite3
 import requests
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import polars as pl
 from dotenv import load_dotenv
 
 from core.assets_registry import daily_assets
+from core.providers.bars_provider import BarsProvider
 
 # ----------------------------
 # Env / Config
@@ -29,7 +31,7 @@ load_dotenv()
 
 TD_TS_URL = "https://api.twelvedata.com/time_series"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-EARNINGS_TIMEFRAMES = ["1day", "1week"]
+EARNINGS_TIMEFRAMES = ["1h", "1week"]
 OVERLAP_BARS = 5
 RATE_LIMIT_SLEEP = 65
 
@@ -43,68 +45,45 @@ def api_key() -> str:
         raise RuntimeError("Missing TWELVEDATA_API_KEY (check .env)")
     return k
 
-def live_db_path(symbol: str) -> Path:
-    return PROJECT_ROOT / "data" / "assets" / symbol / "live.db"
+def get_nth_last_ts_from_parquet(symbol: str, tf: str, n: int) -> Optional[str]:
+    """Get nth-from-last ts from Parquet (for incremental fetch start_date)."""
+    lf = BarsProvider.get_bars(symbol, tf)
+    df = lf.select("ts").sort("ts", descending=True).head(n).collect()
+    if df.is_empty():
+        return None
+    row = df.row(-1)
+    return str(row[0]) if row else None
 
-def ensure_cursor_row(conn: sqlite3.Connection, symbol: str, tf: str) -> None:
-    conn.execute(
-        "INSERT OR IGNORE INTO fetch_cursor(symbol, timeframe, last_ts) VALUES(?,?,NULL);",
-        (symbol, tf),
+
+def values_to_pl_df(values: List[Dict]) -> pl.DataFrame:
+    """Convert Twelve Data API values to Polars DataFrame for BarsProvider."""
+
+    def to_float(x):
+        try:
+            return float(x) if x is not None and x != "" else None
+        except Exception:
+            return None
+
+    if not values:
+        return pl.DataFrame()
+    rows = []
+    for v in values:
+        ts = v.get("datetime")
+        if not ts:
+            continue
+        o = to_float(v.get("open"))
+        h = to_float(v.get("high"))
+        l = to_float(v.get("low"))
+        c = to_float(v.get("close"))
+        vol = to_float(v.get("volume"))
+        rows.append({"ts": ts, "open": o, "high": h, "low": l, "close": c, "volume": int(vol) if vol else 0})
+    df = pl.DataFrame(rows)
+    df = df.with_columns(
+        pl.col("ts").str.to_datetime(),
+        pl.col("volume").cast(pl.Int64),
     )
+    return df
 
-def get_nth_last_ts(conn: sqlite3.Connection, symbol: str, tf: str, n: int) -> Optional[str]:
-    row = conn.execute(
-        """
-        SELECT ts
-        FROM bars
-        WHERE symbol=? AND timeframe=?
-        ORDER BY ts DESC
-        LIMIT 1 OFFSET ?;
-        """,
-        (symbol, tf, max(0, n - 1)),
-    ).fetchone()
-    return row[0] if row else None
-
-def set_cursor_max(conn: sqlite3.Connection, symbol: str, tf: str) -> None:
-    row = conn.execute(
-        "SELECT MAX(ts) FROM bars WHERE symbol=? AND timeframe=?;",
-        (symbol, tf),
-    ).fetchone()
-    max_ts = row[0] if row else None
-    if max_ts:
-        conn.execute(
-            "UPDATE fetch_cursor SET last_ts=? WHERE symbol=? AND timeframe=?;",
-            (max_ts, symbol, tf),
-        )
-
-def ensure_live_db_schema(conn: sqlite3.Connection) -> None:
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS bars(
-            symbol TEXT NOT NULL,
-            timeframe TEXT NOT NULL,
-            ts TEXT NOT NULL,
-            open REAL,
-            high REAL,
-            low REAL,
-            close REAL,
-            volume REAL,
-            source TEXT DEFAULT 'twelvedata',
-            PRIMARY KEY(symbol, timeframe, ts)
-        );
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS fetch_cursor(
-            symbol TEXT NOT NULL,
-            timeframe TEXT NOT NULL,
-            last_ts TEXT,
-            PRIMARY KEY(symbol, timeframe)
-        );
-        """
-    )
-    conn.commit()
 
 def td_time_series(symbol: str, interval: str, start_date: Optional[str]) -> List[Dict]:
     params = {
@@ -131,60 +110,15 @@ def td_time_series(symbol: str, interval: str, start_date: Optional[str]) -> Lis
     values = data.get("values") if isinstance(data, dict) else None
     return values or []
 
-def to_float(x):
-    try:
-        return float(x) if x is not None and x != "" else None
-    except Exception:
-        return None
-
-def insert_bars(conn: sqlite3.Connection, symbol: str, tf: str, values: List[Dict], source: str) -> Tuple[int, Optional[str]]:
-    inserted = 0
-    max_ts = None
-    cur = conn.cursor()
-
-    for v in values:
-        ts = v.get("datetime")
-        if not ts:
-            continue
-
-        o = to_float(v.get("open"))
-        h = to_float(v.get("high"))
-        l = to_float(v.get("low"))
-        c = to_float(v.get("close"))
-        vol = to_float(v.get("volume"))
-
-        cur.execute(
-            """
-            INSERT OR IGNORE INTO bars(symbol, timeframe, ts, open, high, low, close, volume, source)
-            VALUES(?,?,?,?,?,?,?,?, ?);
-            """,
-            (symbol, tf, ts, o, h, l, c, vol, source),
-        )
-        if cur.rowcount > 0:
-            inserted += 1
-
-        if (max_ts is None) or (ts > max_ts):
-            max_ts = ts
-
-    return inserted, max_ts
-
 def fetch_earnings_daily_weekly(symbol: str, provider_symbol: str) -> Tuple[int, Optional[str]]:
     """
-    Fetch daily + weekly bars for earnings tier. Writes to per-asset live.db.
+    Fetch 1h + 1week bars for earnings tier. Appends to Parquet via BarsProvider.
     Returns (inserted_total, error_msg). error_msg is None on success.
     """
-    path = live_db_path(symbol)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(path))
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA synchronous=NORMAL;")
-    ensure_live_db_schema(conn)
-
     total = 0
     try:
         for tf in EARNINGS_TIMEFRAMES:
-            ensure_cursor_row(conn, symbol, tf)
-            start_date = get_nth_last_ts(conn, symbol, tf, OVERLAP_BARS)
+            start_date = get_nth_last_ts_from_parquet(symbol, tf, OVERLAP_BARS)
 
             try:
                 values = td_time_series(provider_symbol, tf, start_date=start_date)
@@ -198,15 +132,15 @@ def fetch_earnings_daily_weekly(symbol: str, provider_symbol: str) -> Tuple[int,
             if not values:
                 continue
 
-            inserted, _ = insert_bars(conn, symbol, tf, values, source="twelvedata")
-            conn.commit()
-            set_cursor_max(conn, symbol, tf)
-            conn.commit()
-            total += inserted
+            df = values_to_pl_df(values)
+            if not df.is_empty():
+                BarsProvider.write_bars(symbol, tf, df)
+                total += len(df)
+                print(f"    Appended {len(df)} {tf} bars for {symbol} to Parquet")
+            else:
+                print(f"    No new {tf} bars for {symbol}")
     except Exception as e:
-        conn.close()
         return total, str(e)
-    conn.close()
     return total, None
 
 # ----------------------------
@@ -225,7 +159,7 @@ def main():
         symbol = asset["symbol"]
         provider_symbol = asset.get("provider_symbol") or symbol
         try:
-            print(f"  Fetching daily/weekly bars for {symbol}")
+            print(f"  Fetching 1h + 1week bars for {symbol}")
             inserted, err = fetch_earnings_daily_weekly(symbol, provider_symbol)
             if err:
                 print(f"  Error updating {symbol}: {err}")
