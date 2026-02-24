@@ -367,14 +367,19 @@ def main():
             try:
                 daily_symbols = [a["symbol"] for a in daily_assets()]
                 if daily_symbols:
-                    print(f"Scheduler (earnings/daily): processing {len(daily_symbols)} symbols")
-                    # TODO: earnings/daily update logic (fetch daily bars, compute daily regime)
-                    # for symbol in daily_symbols:
-                    #     fetch_and_append_daily_bars(symbol)
-                    #     compute_daily_regime(symbol)
-                    pass
+                    print(f"Starting earnings/daily update for {len(daily_symbols)} symbols")
+                    for symbol in daily_symbols:
+                        try:
+                            # Minimal placeholder – replace with actual fetch/append logic later
+                            print(f"  Updating daily bars for {symbol} (placeholder)")
+                            # Example future call:
+                            # fetch_and_append_daily_weekly_bars(symbol)
+                            # compute_daily_regime(symbol)
+                        except Exception as e:
+                            print(f"  Error updating {symbol}: {e}")
+                    print("Earnings/daily update complete")
                 else:
-                    print("No daily/earnings symbols enabled")
+                    print("Skipping earnings/daily – no symbols enabled")
             except Exception as e:
                 print(f"ERROR in earnings/daily block: {e}")
                 # Do NOT re-raise — real-time path must continue unaffected
