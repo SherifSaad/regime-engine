@@ -4,16 +4,32 @@ Asset class rules + symbol→class mapping.
 Asset classes: Index, Stocks, FX, Crypto, Commodities, Futures, Fixed Income.
 """
 
-from core.assets_registry import default_assets, get_asset
+from core.assets_registry import load_universe
 
-# Symbol → asset_class (derived from registry; used by scheduler/session logic)
+# Map universe asset_class to legacy names (Index, Stocks, FX, Crypto, etc.)
+_UNIVERSE_TO_LEGACY = {
+    "US_EQUITY_INDEX": "Index",
+    "US_EQUITY": "Stocks",
+    "US_MEGA_CAP": "Stocks",
+    "CRYPTO": "Crypto",
+    "FX": "FX",
+    "Commodities": "Commodities",
+    "Futures": "Futures",
+    "Fixed Income": "Fixed Income",
+}
+
+# Symbol → asset_class (derived from universe.json; used by scheduler/session logic)
 def _build_symbol_to_class() -> dict:
     out = {}
-    for a in default_assets():
-        out[a.symbol.upper()] = a.asset_class
+    for a in load_universe():
+        if a.get("active", True):
+            ac = a.get("asset_class", "US_EQUITY")
+            legacy = _UNIVERSE_TO_LEGACY.get(ac, "Stocks" if "EQUITY" in str(ac) else ac)
+            out[a["symbol"].upper()] = legacy
     return out
 
 SYMBOL_TO_ASSET_CLASS = _build_symbol_to_class()
+print(f"Loaded {len(SYMBOL_TO_ASSET_CLASS)} asset classes from universe")
 
 ASSET_CLASS_RULES = {
     "Index": {
