@@ -5,8 +5,8 @@ Real-time scheduler – core regime symbols only.
 Loop:
   1) For each asset in real_time_assets():
        - Skip US equities outside US trading hours (RTH)
-       - Fetch incremental bars (overlap) -> insert into regime_cache.db
-  2) If ANY new bars inserted -> compute ALL 5 TF states for that symbol
+       - Fetch incremental bars (overlap) -> append to Parquet via BarsProvider
+  2) If ANY new bars inserted -> compute ALL 5 TF states (read from Parquet, write state to regime_cache.db)
   3) Sleep and repeat
 
 Notes:
@@ -27,12 +27,14 @@ from zoneinfo import ZoneInfo
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
+import polars as pl
 from dotenv import load_dotenv
 
 from regime_engine.cli import compute_market_state_from_df
 
 from core.assets_registry import real_time_assets, LegacyAsset
 from core.asset_class_rules import should_poll
+from core.providers.bars_provider import BarsProvider
 
 # ----------------------------
 # Env / Config
@@ -73,37 +75,6 @@ def connect(db: str) -> sqlite3.Connection:
     conn.execute("PRAGMA synchronous=NORMAL;")
     return conn
 
-def ensure_cursor_row(conn: sqlite3.Connection, symbol: str, tf: str) -> None:
-    conn.execute(
-        "INSERT OR IGNORE INTO fetch_cursor(symbol, timeframe, last_ts) VALUES(?,?,NULL);",
-        (symbol, tf),
-    )
-
-def get_nth_last_ts(conn: sqlite3.Connection, symbol: str, tf: str, n: int) -> Optional[str]:
-    row = conn.execute(
-        """
-        SELECT ts
-        FROM bars
-        WHERE symbol=? AND timeframe=?
-        ORDER BY ts DESC
-        LIMIT 1 OFFSET ?;
-        """,
-        (symbol, tf, max(0, n - 1)),
-    ).fetchone()
-    return row[0] if row else None
-
-def set_cursor_max(conn: sqlite3.Connection, symbol: str, tf: str) -> None:
-    row = conn.execute(
-        "SELECT MAX(ts) FROM bars WHERE symbol=? AND timeframe=?;",
-        (symbol, tf),
-    ).fetchone()
-    max_ts = row[0] if row else None
-    if max_ts:
-        conn.execute(
-            "UPDATE fetch_cursor SET last_ts=? WHERE symbol=? AND timeframe=?;",
-            (max_ts, symbol, tf),
-        )
-
 def td_time_series(symbol: str, interval: str, start_date: Optional[str]) -> List[Dict]:
     params = {
         "apikey": api_key(),
@@ -135,46 +106,51 @@ def to_float(x):
     except Exception:
         return None
 
-def insert_bars(conn: sqlite3.Connection, symbol: str, tf: str, values: List[Dict], source: str) -> Tuple[int, Optional[str]]:
-    inserted = 0
-    max_ts = None
-    cur = conn.cursor()
 
+def get_nth_last_ts_from_parquet(symbol: str, tf: str, n: int) -> Optional[str]:
+    """Get nth-from-last ts from Parquet (for incremental fetch start_date)."""
+    lf = BarsProvider.get_bars(symbol, tf)
+    df = lf.select("ts").sort("ts", descending=True).head(n).collect()
+    if df.is_empty():
+        return None
+    row = df.row(-1)  # nth from end (or oldest if fewer than n rows)
+    return str(row[0]) if row else None
+
+
+def values_to_pl_df(values: List[Dict]) -> pl.DataFrame:
+    """Convert Twelve Data API values to Polars DataFrame for BarsProvider."""
+    if not values:
+        return pl.DataFrame()
+    rows = []
     for v in values:
         ts = v.get("datetime")
         if not ts:
             continue
-
         o = to_float(v.get("open"))
         h = to_float(v.get("high"))
         l = to_float(v.get("low"))
         c = to_float(v.get("close"))
         vol = to_float(v.get("volume"))
+        if vol is not None:
+            vol = int(vol)
+        rows.append({"ts": ts, "open": o, "high": h, "low": l, "close": c, "volume": vol or 0})
+    df = pl.DataFrame(rows)
+    df = df.with_columns(
+        pl.col("ts").str.to_datetime(),
+        pl.col("volume").cast(pl.Int64),
+    )
+    return df
 
-        cur.execute(
-            """
-            INSERT OR IGNORE INTO bars(symbol, timeframe, ts, open, high, low, close, volume, source)
-            VALUES(?,?,?,?,?,?,?,?, ?);
-            """,
-            (symbol, tf, ts, o, h, l, c, vol, source),
-        )
-        if cur.rowcount > 0:
-            inserted += 1
-
-        if (max_ts is None) or (ts > max_ts):
-            max_ts = ts
-
-    return inserted, max_ts
 
 def fetch_incremental_symbol(conn: sqlite3.Connection, symbol: str, vendor_symbol: str) -> Tuple[int, int]:
+    """Fetch new bars from API and append to Parquet via BarsProvider."""
     total = 0
     polled = 0
     for tf in TIMEFRAMES:
         if not should_poll(symbol, tf):
             continue
 
-        ensure_cursor_row(conn, symbol, tf)
-        start_date = get_nth_last_ts(conn, symbol, tf, OVERLAP_BARS)
+        start_date = get_nth_last_ts_from_parquet(symbol, tf, OVERLAP_BARS)
 
         try:
             polled += 1
@@ -192,43 +168,35 @@ def fetch_incremental_symbol(conn: sqlite3.Connection, symbol: str, vendor_symbo
         if not values:
             continue
 
-        inserted, _ = insert_bars(conn, symbol, tf, values, source="twelvedata")
-        conn.commit()
-        set_cursor_max(conn, symbol, tf)
-        conn.commit()
-
-        if inserted > 0:
-            print(f"[FETCH] {symbol} {tf}: fetched={len(values)} inserted={inserted}")
-        total += inserted
+        df = values_to_pl_df(values)
+        if not df.is_empty():
+            BarsProvider.write_bars(symbol, tf, df)
+            total += len(df)
+            print(f"[FETCH] {symbol} {tf}: fetched={len(values)} appended={len(df)} to Parquet")
+        else:
+            print(f"[FETCH] {symbol} {tf}: no new bars")
 
     return total, polled
 
-def load_bars_df(conn: sqlite3.Connection, symbol: str, tf: str, limit: int) -> pd.DataFrame:
-    rows = conn.execute(
-        """
-        SELECT ts, open, high, low, close, volume
-        FROM bars
-        WHERE symbol=? AND timeframe=?
-        ORDER BY ts DESC
-        LIMIT ?;
-        """,
-        (symbol, tf, limit),
-    ).fetchall()
-
-    if not rows:
+def load_bars_df_from_parquet(symbol: str, tf: str, limit: int) -> pd.DataFrame:
+    """Load bars from Parquet for compute. Returns pandas DataFrame with ts index."""
+    lf = BarsProvider.get_bars(symbol, tf)
+    pl_df = lf.sort("ts", descending=True).head(limit).collect()
+    if pl_df.is_empty():
         return pd.DataFrame()
-
-    df = pd.DataFrame(rows, columns=["ts", "open", "high", "low", "close", "volume"])
+    df = pd.DataFrame(pl_df.to_dicts())
     df["ts"] = pd.to_datetime(df["ts"])
     df = df.sort_values("ts").reset_index(drop=True)
     return df
 
-def get_latest_bar_ts(conn: sqlite3.Connection, symbol: str, tf: str) -> Optional[str]:
-    row = conn.execute(
-        "SELECT MAX(ts) FROM bars WHERE symbol=? AND timeframe=?;",
-        (symbol, tf),
-    ).fetchone()
-    return row[0] if row and row[0] else None
+
+def get_latest_bar_ts_from_parquet(symbol: str, tf: str) -> Optional[str]:
+    """Get latest bar ts from Parquet."""
+    lf = BarsProvider.get_bars(symbol, tf)
+    row = lf.select(pl.col("ts").max()).collect()
+    if row.is_empty() or row[0, 0] is None:
+        return None
+    return str(row[0, 0])
 
 def upsert_latest_state(conn: sqlite3.Connection, symbol: str, tf: str, asof: str, state: Dict) -> None:
     state_json = json.dumps(state, separators=(",", ":"), ensure_ascii=False)
@@ -256,12 +224,13 @@ def insert_state_history(conn: sqlite3.Connection, symbol: str, tf: str, asof: s
     )
 
 def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: int) -> None:
+    """Read bars from Parquet, compute state, persist to regime_cache.db."""
     for tf in TIMEFRAMES:
-        latest_ts = get_latest_bar_ts(conn, symbol, tf)
+        latest_ts = get_latest_bar_ts_from_parquet(symbol, tf)
         if not latest_ts:
             continue
 
-        df = load_bars_df(conn, symbol, tf, lookback)
+        df = load_bars_df_from_parquet(symbol, tf, lookback)
         if df.empty or len(df) < 200:
             continue
 
