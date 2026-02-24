@@ -13,6 +13,7 @@ Notes:
 """
 
 import json
+import logging
 import os
 import sys
 import time
@@ -45,6 +46,13 @@ load_dotenv()
 
 TD_TS_URL = "https://api.twelvedata.com/time_series"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+LOG_DIR = PROJECT_ROOT / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+logging.basicConfig(
+    filename=str(LOG_DIR / "scheduler.log"),
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
 EARNINGS_TIMEFRAMES = ["1h", "1week"]
 OVERLAP_BARS = 5
 RATE_LIMIT_SLEEP = 65
@@ -206,6 +214,8 @@ def compute_and_persist_earnings_symbol(conn, symbol: str, lookback: int) -> Non
         if not latest_ts:
             continue
 
+        t0 = time.time()
+        cache_status = "MISS"
         try:
             lf = BarsProvider.get_bars(symbol, tf)
             pl_df = lf.sort("ts", descending=True).head(lookback).collect()
@@ -223,6 +233,7 @@ def compute_and_persist_earnings_symbol(conn, symbol: str, lookback: int) -> Non
                     and prev_meta.get("n_rows") == n_rows
                     and prev_meta.get("code_version") == CODE_VERSION
                 ):
+                    cache_status = "HIT"
                     result_df = prev_result
                     state = polars_result_to_state(result_df, symbol, tf)
                     if state:
@@ -230,7 +241,8 @@ def compute_and_persist_earnings_symbol(conn, symbol: str, lookback: int) -> Non
                         upsert_latest_state(conn, symbol, tf, asof, state)
                         insert_state_history(conn, symbol, tf, asof, state)
                         conn.commit()
-                        print(f"    [COMPUTE] {symbol} {tf}: cache hit asof={asof}")
+                        duration = time.time() - t0
+                        print(f"    [{symbol} {tf}] Compute: {cache_status}, {duration:.2f}s")
                         continue
 
             # Compute: incremental or full
@@ -239,13 +251,10 @@ def compute_and_persist_earnings_symbol(conn, symbol: str, lookback: int) -> Non
                 new_bars = pl_df.filter(pl.col("ts") > prev_max_ts)
                 if len(new_bars) > 0 and len(pl_df) >= len(prev_result):
                     result_df = compute_regime_polars_incremental(new_bars, prev_result, CODE_VERSION)
-                    print(f"    [COMPUTE] {symbol} {tf}: incremental (+{len(new_bars)} bars)")
                 else:
                     result_df = compute_regime_polars(pl_df)
-                    print(f"    [COMPUTE] {symbol} {tf}: full recompute")
             else:
                 result_df = compute_regime_polars(pl_df)
-                print(f"    [COMPUTE] {symbol} {tf}: full compute")
 
             state = polars_result_to_state(result_df, symbol, tf)
             if not state:
@@ -256,9 +265,12 @@ def compute_and_persist_earnings_symbol(conn, symbol: str, lookback: int) -> Non
             insert_state_history(conn, symbol, tf, asof, state)
             conn.commit()
             persist_regime_cache(symbol, tf, result_df, latest_ts, len(result_df), CODE_VERSION)
-            print(f"    [COMPUTE] {symbol} {tf}: wrote asof={asof}")
+            duration = time.time() - t0
+            print(f"    [{symbol} {tf}] Compute: {cache_status}, {duration:.2f}s")
         except Exception as e:
-            print(f"    [COMPUTE] {symbol} {tf}: ERROR {e}", file=sys.stderr)
+            duration = time.time() - t0
+            logging.exception("[%s %s] Compute failed: %s", symbol, tf, e)
+            print(f"    [{symbol} {tf}] Compute: ERROR, {duration:.2f}s – {e}", file=sys.stderr)
 
 
 # ----------------------------

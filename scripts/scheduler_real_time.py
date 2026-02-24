@@ -18,16 +18,18 @@ Notes:
 - REGIME_LOOKBACK optional (default 2000)
 """
 
+import json
+import logging
 import os
+import sqlite3
 import sys
 import time
-import sqlite3
-import requests
-import json
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from typing import Dict, List, Optional, Tuple
+
+import requests
 
 import pandas as pd
 import polars as pl
@@ -54,10 +56,18 @@ from core.providers.bars_provider import BarsProvider
 
 load_dotenv()
 
+# Logging
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+LOG_DIR = PROJECT_ROOT / "logs"
+LOG_DIR.mkdir(exist_ok=True)
+logging.basicConfig(
+    filename=str(LOG_DIR / "scheduler.log"),
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
+
 TIMEFRAMES = ["15min", "1h", "4h", "1day", "1week"]
 TD_TS_URL = "https://api.twelvedata.com/time_series"
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = str(PROJECT_ROOT / "data" / "regime_cache.db")
 
 OVERLAP_BARS = 5
@@ -242,6 +252,8 @@ def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: 
         if not latest_ts:
             continue
 
+        t0 = time.time()
+        cache_status = "MISS"
         try:
             lf = BarsProvider.get_bars(symbol, tf)
             pl_df = lf.sort("ts", descending=True).head(lookback).collect()
@@ -260,6 +272,7 @@ def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: 
                     and prev_meta.get("n_rows") == n_rows
                     and prev_meta.get("code_version") == CODE_VERSION
                 ):
+                    cache_status = "HIT"
                     result_df = prev_result
                     state = polars_result_to_state(result_df, symbol, tf)
                     if state:
@@ -267,7 +280,8 @@ def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: 
                         upsert_latest_state(conn, symbol, tf, asof, state)
                         insert_state_history(conn, symbol, tf, asof, state)
                         conn.commit()
-                        print(f"[COMPUTE] {symbol} {tf}: cache hit asof={asof}")
+                        duration = time.time() - t0
+                        print(f"[{symbol} {tf}] Compute: {cache_status}, {duration:.2f}s")
                         continue
 
             # Compute: incremental if we have previous + new bars, else full
@@ -276,13 +290,10 @@ def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: 
                 new_bars = pl_df.filter(pl.col("ts") > prev_max_ts)
                 if len(new_bars) > 0 and len(pl_df) >= len(prev_result):
                     result_df = compute_regime_polars_incremental(new_bars, prev_result, CODE_VERSION)
-                    print(f"[COMPUTE] {symbol} {tf}: incremental (+{len(new_bars)} bars)")
                 else:
                     result_df = compute_regime_polars(pl_df)
-                    print(f"[COMPUTE] {symbol} {tf}: full recompute")
             else:
                 result_df = compute_regime_polars(pl_df)
-                print(f"[COMPUTE] {symbol} {tf}: full compute")
 
             state = polars_result_to_state(result_df, symbol, tf)
             if not state:
@@ -293,9 +304,12 @@ def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: 
             insert_state_history(conn, symbol, tf, asof, state)
             conn.commit()
             persist_regime_cache(symbol, tf, result_df, latest_ts, len(result_df), CODE_VERSION)
-            print(f"[COMPUTE] {symbol} {tf}: wrote asof={asof} cache_key={cache_key}")
+            duration = time.time() - t0
+            print(f"[{symbol} {tf}] Compute: {cache_status}, {duration:.2f}s")
         except Exception as e:
-            print(f"[COMPUTE] {symbol} {tf}: Polars failed ({e}), falling back to legacy", file=sys.stderr)
+            duration = time.time() - t0
+            logging.exception("[%s %s] Polars failed: %s", symbol, tf, e)
+            print(f"[{symbol} {tf}] Compute: ERROR, {duration:.2f}s – {e}", file=sys.stderr)
             try:
                 df = load_bars_df_from_parquet(symbol, tf, lookback)
                 if df.empty or len(df) < 200:
@@ -314,9 +328,12 @@ def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: 
                 upsert_latest_state(conn, symbol, tf, asof, state)
                 insert_state_history(conn, symbol, tf, asof, state)
                 conn.commit()
-                print(f"[COMPUTE] {symbol} {tf}: wrote asof={asof} (legacy fallback)")
+                duration = time.time() - t0
+                print(f"[{symbol} {tf}] Compute: {cache_status} (legacy fallback), {duration:.2f}s")
             except Exception as e2:
-                print(f"[COMPUTE] {symbol} {tf}: ERROR {e2}", file=sys.stderr)
+                duration = time.time() - t0
+                logging.exception("[%s %s] Legacy fallback failed: %s", symbol, tf, e2)
+                print(f"[{symbol} {tf}] Compute: ERROR, {duration:.2f}s – {e2}", file=sys.stderr)
 
 # ----------------------------
 # Main loop
