@@ -190,8 +190,52 @@ def compute_regime_polars_incremental(
     df_tail = full_bars.tail(WINDOW_MAX + n_new)
     result_tail = compute_regime_polars(df_tail)
     prefix = previous_result.head(start_idx)
+    # Align columns (prefix may have extra e.g. date from old cache)
+    tail_cols = result_tail.columns
+    prefix = prefix.select([c for c in tail_cols if c in prefix.columns])
     result = pl.concat([prefix, result_tail])
     return result
+
+
+def polars_result_to_state(result_df: pl.DataFrame, symbol: str, tf: str) -> Optional[dict]:
+    """Build state dict from last row of Polars regime result. Compatible with regime_cache schema."""
+    if result_df.is_empty():
+        return None
+    last = result_df.tail(1)
+    row = last.to_dicts()[0]
+    ts_val = row.get("ts")
+    asof = str(ts_val) if ts_val else ""
+    regime_label = str(row.get("regime_state", "TRANSITION"))
+    vol_r = float(row.get("vol_regime", 0.5) or 0.5)
+    dd_p = float(row.get("drawdown_pressure", 0.5) or 0.5)
+    escalation_v2 = min(1.0, (vol_r + dd_p) / 2)
+    confidence = float(row.get("trend_strength", 0.5) or 0.5)
+    metrics_11 = [
+        {"metric": "Trend Strength", "pct": float(row.get("trend_strength", 0.5) or 0.5)},
+        {"metric": "Vol Regime", "pct": vol_r},
+        {"metric": "Drawdown Pressure", "pct": dd_p},
+        {"metric": "Downside Shock", "pct": float(row.get("downside_shock", 0.5) or 0.5)},
+        {"metric": "Asymmetry", "pct": float(row.get("asymmetry", 0.5) or 0.5)},
+        {"metric": "Momentum State", "pct": float(row.get("momentum_state", 0.5) or 0.5)},
+        {"metric": "Structural Score", "pct": float(row.get("structural_score", 0.5) or 0.5)},
+        {"metric": "Liquidity", "pct": float(row.get("liquidity", 0.5) or 0.5)},
+        {"metric": "Gap Risk", "pct": float(row.get("gap_risk", 0.5) or 0.5)},
+        {"metric": "Key-Level Pressure", "pct": float(row.get("key_level_pressure", 0.5) or 0.5)},
+        {"metric": "Breadth Proxy", "pct": float(row.get("breadth_proxy", 0.5) or 0.5)},
+    ]
+    risk_posture = "DEFENSIVE" if escalation_v2 >= 0.5 else "NEUTRAL" if escalation_v2 >= 0.25 else "SUPPORTIVE"
+    return {
+        "asof": asof,
+        "timeframe": tf,
+        "classification": {
+            "regime_label": regime_label,
+            "confidence": confidence,
+            "conviction": "MEDIUM_CONVICTION",
+            "risk_posture": risk_posture,
+        },
+        "escalation_v2": escalation_v2,
+        "metrics_11": metrics_11,
+    }
 
 
 def load_regime_cache(symbol: str, timeframe: str) -> tuple[Optional[pl.DataFrame], Optional[dict]]:

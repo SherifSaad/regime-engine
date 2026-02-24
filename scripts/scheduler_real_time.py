@@ -38,10 +38,12 @@ from regime_engine.cli import compute_market_state_from_df
 from core.assets_registry import real_time_assets, LegacyAsset
 from core.compute.regime_engine_polars import (
     CODE_VERSION,
+    RAW_COLS,
     compute_regime_polars,
     compute_regime_polars_incremental,
     load_regime_cache,
     persist_regime_cache,
+    polars_result_to_state,
 )
 from core.asset_class_rules import should_poll
 from core.providers.bars_provider import BarsProvider
@@ -233,48 +235,6 @@ def insert_state_history(conn: sqlite3.Connection, symbol: str, tf: str, asof: s
         (symbol, tf, asof, state_json),
     )
 
-def _polars_result_to_state(result_df: pl.DataFrame, symbol: str, tf: str) -> Optional[Dict]:
-    """Build state dict from last row of Polars regime result. Compatible with regime_cache schema."""
-    if result_df.is_empty():
-        return None
-    last = result_df.tail(1)
-    row = last.to_dicts()[0]
-    ts_val = row.get("ts")
-    asof = str(ts_val) if ts_val else ""
-    regime_label = str(row.get("regime_state", "TRANSITION"))
-    # Escalation proxy: avg of vol_regime and drawdown_pressure (0-1)
-    vol_r = float(row.get("vol_regime", 0.5) or 0.5)
-    dd_p = float(row.get("drawdown_pressure", 0.5) or 0.5)
-    escalation_v2 = min(1.0, (vol_r + dd_p) / 2)
-    confidence = float(row.get("trend_strength", 0.5) or 0.5)
-    metrics_11 = [
-        {"metric": "Trend Strength", "pct": float(row.get("trend_strength", 0.5) or 0.5)},
-        {"metric": "Vol Regime", "pct": vol_r},
-        {"metric": "Drawdown Pressure", "pct": dd_p},
-        {"metric": "Downside Shock", "pct": float(row.get("downside_shock", 0.5) or 0.5)},
-        {"metric": "Asymmetry", "pct": float(row.get("asymmetry", 0.5) or 0.5)},
-        {"metric": "Momentum State", "pct": float(row.get("momentum_state", 0.5) or 0.5)},
-        {"metric": "Structural Score", "pct": float(row.get("structural_score", 0.5) or 0.5)},
-        {"metric": "Liquidity", "pct": float(row.get("liquidity", 0.5) or 0.5)},
-        {"metric": "Gap Risk", "pct": float(row.get("gap_risk", 0.5) or 0.5)},
-        {"metric": "Key-Level Pressure", "pct": float(row.get("key_level_pressure", 0.5) or 0.5)},
-        {"metric": "Breadth Proxy", "pct": float(row.get("breadth_proxy", 0.5) or 0.5)},
-    ]
-    risk_posture = "DEFENSIVE" if escalation_v2 >= 0.5 else "NEUTRAL" if escalation_v2 >= 0.25 else "SUPPORTIVE"
-    return {
-        "asof": asof,
-        "timeframe": tf,
-        "classification": {
-            "regime_label": regime_label,
-            "confidence": confidence,
-            "conviction": "MEDIUM_CONVICTION",
-            "risk_posture": risk_posture,
-        },
-        "escalation_v2": escalation_v2,
-        "metrics_11": metrics_11,
-    }
-
-
 def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: int) -> None:
     """Read bars from Parquet, compute state via Polars (incremental + cache), persist to regime_cache.db."""
     for tf in TIMEFRAMES:
@@ -287,7 +247,7 @@ def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: 
             pl_df = lf.sort("ts", descending=True).head(lookback).collect()
             if pl_df.is_empty() or len(pl_df) < 200:
                 continue
-            pl_df = pl_df.sort("ts")  # ascending for rolling calcs
+            pl_df = pl_df.select([c for c in RAW_COLS if c in pl_df.columns]).sort("ts")
 
             n_rows = len(pl_df)
             prev_result, prev_meta = load_regime_cache(symbol, tf)
@@ -301,7 +261,7 @@ def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: 
                     and prev_meta.get("code_version") == CODE_VERSION
                 ):
                     result_df = prev_result
-                    state = _polars_result_to_state(result_df, symbol, tf)
+                    state = polars_result_to_state(result_df, symbol, tf)
                     if state:
                         asof = state.get("asof", latest_ts)
                         upsert_latest_state(conn, symbol, tf, asof, state)
@@ -324,7 +284,7 @@ def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: 
                 result_df = compute_regime_polars(pl_df)
                 print(f"[COMPUTE] {symbol} {tf}: full compute")
 
-            state = _polars_result_to_state(result_df, symbol, tf)
+            state = polars_result_to_state(result_df, symbol, tf)
             if not state:
                 continue
 

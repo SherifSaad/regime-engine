@@ -4,6 +4,7 @@ Earnings scheduler – 1h + 1week bars for earnings tier symbols.
 
 100% Parquet for bars: reads (last_ts/cursor) and writes from Parquet via BarsProvider.
 Single run: fetch 1h and 1week bars for all daily_assets(), append to Parquet.
+Compute regime (Polars incremental + cache) and persist to regime_cache.db.
 No RTH check – runs once per day (cron) or on demand.
 Only 1h and 1week (not 15min, 4h, 1d) for earnings assets.
 
@@ -11,18 +12,30 @@ Notes:
 - TWELVEDATA_API_KEY required in .env
 """
 
+import json
 import os
 import sys
 import time
-import requests
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import polars as pl
+import requests
 from dotenv import load_dotenv
 
 from core.assets_registry import daily_assets
+from core.compute.regime_engine_polars import (
+    CODE_VERSION,
+    RAW_COLS,
+    compute_regime_polars,
+    compute_regime_polars_incremental,
+    load_regime_cache,
+    persist_regime_cache,
+    polars_result_to_state,
+)
 from core.providers.bars_provider import BarsProvider
+from core.storage import get_conn, init_db
 
 # ----------------------------
 # Env / Config
@@ -35,6 +48,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 EARNINGS_TIMEFRAMES = ["1h", "1week"]
 OVERLAP_BARS = 5
 RATE_LIMIT_SLEEP = 65
+EARNINGS_LOOKBACK = int(os.getenv("REGIME_LOOKBACK", "2000"))
 
 # ----------------------------
 # Helpers
@@ -45,6 +59,19 @@ def api_key() -> str:
     if not k:
         raise RuntimeError("Missing TWELVEDATA_API_KEY (check .env)")
     return k
+
+def now_utc_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def get_latest_bar_ts_from_parquet(symbol: str, tf: str) -> Optional[str]:
+    """Get latest bar ts from Parquet."""
+    lf = BarsProvider.get_bars(symbol, tf)
+    row = lf.select(pl.col("ts").max()).collect()
+    if row.is_empty() or row[0, 0] is None:
+        return None
+    return str(row[0, 0])
+
 
 def get_nth_last_ts_from_parquet(symbol: str, tf: str, n: int) -> Optional[str]:
     """Get nth-from-last ts from Parquet (for incremental fetch start_date)."""
@@ -144,6 +171,96 @@ def fetch_earnings_daily_weekly(symbol: str, provider_symbol: str) -> Tuple[int,
         return total, str(e)
     return total, None
 
+
+def upsert_latest_state(conn, symbol: str, tf: str, asof: str, state: Dict) -> None:
+    state_json = json.dumps(state, separators=(",", ":"), ensure_ascii=False)
+    updated_at = now_utc_iso()
+    conn.execute(
+        """
+        INSERT INTO latest_state(symbol,timeframe,asof,state_json,updated_at)
+        VALUES(?,?,?,?,?)
+        ON CONFLICT(symbol,timeframe) DO UPDATE SET
+            asof=excluded.asof,
+            state_json=excluded.state_json,
+            updated_at=excluded.updated_at;
+        """,
+        (symbol, tf, asof, state_json, updated_at),
+    )
+
+
+def insert_state_history(conn, symbol: str, tf: str, asof: str, state: Dict) -> None:
+    state_json = json.dumps(state, separators=(",", ":"), ensure_ascii=False)
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO state_history(symbol,timeframe,asof,state_json)
+        VALUES(?,?,?,?);
+        """,
+        (symbol, tf, asof, state_json),
+    )
+
+
+def compute_and_persist_earnings_symbol(conn, symbol: str, lookback: int) -> None:
+    """Compute regime for 1h + 1week (Polars incremental + cache), persist to regime_cache.db."""
+    for tf in EARNINGS_TIMEFRAMES:
+        latest_ts = get_latest_bar_ts_from_parquet(symbol, tf)
+        if not latest_ts:
+            continue
+
+        try:
+            lf = BarsProvider.get_bars(symbol, tf)
+            pl_df = lf.sort("ts", descending=True).head(lookback).collect()
+            if pl_df.is_empty() or len(pl_df) < 200:
+                continue
+            pl_df = pl_df.select([c for c in RAW_COLS if c in pl_df.columns]).sort("ts")
+
+            n_rows = len(pl_df)
+            prev_result, prev_meta = load_regime_cache(symbol, tf)
+
+            # Cache hit
+            if prev_meta and prev_result is not None:
+                if (
+                    prev_meta.get("last_bar_ts") == latest_ts
+                    and prev_meta.get("n_rows") == n_rows
+                    and prev_meta.get("code_version") == CODE_VERSION
+                ):
+                    result_df = prev_result
+                    state = polars_result_to_state(result_df, symbol, tf)
+                    if state:
+                        asof = state.get("asof", latest_ts)
+                        upsert_latest_state(conn, symbol, tf, asof, state)
+                        insert_state_history(conn, symbol, tf, asof, state)
+                        conn.commit()
+                        print(f"    [COMPUTE] {symbol} {tf}: cache hit asof={asof}")
+                        continue
+
+            # Compute: incremental or full
+            if prev_result is not None and not prev_result.is_empty():
+                prev_max_ts = prev_result["ts"].max()
+                new_bars = pl_df.filter(pl.col("ts") > prev_max_ts)
+                if len(new_bars) > 0 and len(pl_df) >= len(prev_result):
+                    result_df = compute_regime_polars_incremental(new_bars, prev_result, CODE_VERSION)
+                    print(f"    [COMPUTE] {symbol} {tf}: incremental (+{len(new_bars)} bars)")
+                else:
+                    result_df = compute_regime_polars(pl_df)
+                    print(f"    [COMPUTE] {symbol} {tf}: full recompute")
+            else:
+                result_df = compute_regime_polars(pl_df)
+                print(f"    [COMPUTE] {symbol} {tf}: full compute")
+
+            state = polars_result_to_state(result_df, symbol, tf)
+            if not state:
+                continue
+
+            asof = state.get("asof", latest_ts)
+            upsert_latest_state(conn, symbol, tf, asof, state)
+            insert_state_history(conn, symbol, tf, asof, state)
+            conn.commit()
+            persist_regime_cache(symbol, tf, result_df, latest_ts, len(result_df), CODE_VERSION)
+            print(f"    [COMPUTE] {symbol} {tf}: wrote asof={asof}")
+        except Exception as e:
+            print(f"    [COMPUTE] {symbol} {tf}: ERROR {e}", file=sys.stderr)
+
+
 # ----------------------------
 # Main
 # ----------------------------
@@ -156,6 +273,9 @@ def main():
         print("No daily/earnings symbols enabled")
         return
 
+    init_db()
+    conn = get_conn()
+
     for asset in daily_list:
         symbol = asset["symbol"]
         provider_symbol = asset.get("provider_symbol") or symbol
@@ -166,9 +286,11 @@ def main():
                 print(f"  Error updating {symbol}: {err}")
             else:
                 print(f"  Success: updated {symbol} (inserted={inserted})")
+                compute_and_persist_earnings_symbol(conn, symbol, EARNINGS_LOOKBACK)
         except Exception as e:
             print(f"  Error updating {symbol}: {e}")
 
+    conn.close()
     print("Earnings daily run complete")
 
 if __name__ == "__main__":
