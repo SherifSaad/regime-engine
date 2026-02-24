@@ -27,8 +27,8 @@ def _default_assets_symbols() -> List[str]:
 
 
 def scheduler_assets() -> List[Dict]:
-    """Symbols scheduler should process (configurable filter)."""
-    return [a for a in load_universe() if a.get("scheduler_enabled", True)]
+    """Returns only assets explicitly enabled for scheduler."""
+    return [a for a in load_universe() if a.get("scheduler_enabled", False)]
 
 
 # ───────────────────────────────────────────────────────────────
