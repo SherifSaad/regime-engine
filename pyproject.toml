@@ -8,6 +8,7 @@ dependencies = [
   "pandas>=2.0",
   "numpy>=1.24",
   "python-dateutil",
+  "polars>=1.0.0,<2.0",
 ]
 
 [project.optional-dependencies]
