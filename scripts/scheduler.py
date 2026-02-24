@@ -29,7 +29,7 @@ from dotenv import load_dotenv
 
 from regime_engine.cli import compute_market_state_from_df
 
-from core.assets_registry import real_time_assets, LegacyAsset
+from core.assets_registry import real_time_assets, daily_assets, LegacyAsset
 from core.asset_class_rules import should_poll
 
 # ----------------------------
@@ -362,6 +362,22 @@ def main():
                         print(f"[PIPELINE] Polled={total_polled} calls, inserted={total_inserted}. No new bars. Sleeping {SLEEP_SEC}s.\n")
                 else:
                     print(f"\n[PIPELINE] Updated symbols: {', '.join(changed_symbols)} | polled={total_polled} inserted={total_inserted}. Sleeping {SLEEP_SEC}s.\n")
+
+            # Isolated earnings/daily tier — failures here never affect real-time
+            try:
+                daily_symbols = [a["symbol"] for a in daily_assets()]
+                if daily_symbols:
+                    print(f"Scheduler (earnings/daily): processing {len(daily_symbols)} symbols")
+                    # TODO: earnings/daily update logic (fetch daily bars, compute daily regime)
+                    # for symbol in daily_symbols:
+                    #     fetch_and_append_daily_bars(symbol)
+                    #     compute_daily_regime(symbol)
+                    pass
+                else:
+                    print("No daily/earnings symbols enabled")
+            except Exception as e:
+                print(f"ERROR in earnings/daily block: {e}")
+                # Do NOT re-raise — real-time path must continue unaffected
 
             time.sleep(SLEEP_SEC)
 
