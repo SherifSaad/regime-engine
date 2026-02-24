@@ -7,6 +7,7 @@ as partitioned Parquet (by date).
 
 Usage:
   python scripts/migrate_live_to_parquet.py [--symbol SPY]
+  python scripts/migrate_live_to_parquet.py --all   # migrate all real_time_assets()
 """
 
 import argparse
@@ -15,6 +16,7 @@ from pathlib import Path
 
 import polars as pl
 
+from core.assets_registry import real_time_assets
 from core.providers.bars_provider import BarsProvider
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -63,13 +65,27 @@ def migrate_symbol(symbol: str) -> int:
 
 def main():
     ap = argparse.ArgumentParser(description="Migrate live.db bars to Parquet")
-    ap.add_argument("--symbol", default="SPY", help="Symbol to migrate (default: SPY)")
+    ap.add_argument("--symbol", help="Single symbol to migrate (e.g. SPY)")
+    ap.add_argument("--all", action="store_true", help="Migrate all real-time core symbols")
     args = ap.parse_args()
 
-    symbol = args.symbol.strip().upper()
-    print(f"Migrating {symbol} bars to Parquet...")
-    total = migrate_symbol(symbol)
-    print(f"Migrated {symbol} bars to Parquet: {total} rows")
+    if args.all:
+        assets = real_time_assets()
+        symbols = [a["symbol"] for a in assets]
+        print(f"Migrating {len(symbols)} real-time symbols: {symbols}")
+        grand_total = 0
+        for symbol in symbols:
+            try:
+                total = migrate_symbol(symbol)
+                grand_total += total
+            except Exception as e:
+                print(f"Error migrating {symbol}: {e}")
+        print(f"Migrated {grand_total} total rows across {len(symbols)} symbols")
+    else:
+        symbol = (args.symbol or "SPY").strip().upper()
+        print(f"Migrating {symbol} bars to Parquet...")
+        total = migrate_symbol(symbol)
+        print(f"Migrated {symbol} bars to Parquet: {total} rows")
 
 
 if __name__ == "__main__":
