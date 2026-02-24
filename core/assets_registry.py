@@ -31,6 +31,21 @@ def scheduler_assets() -> List[Dict]:
     return [a for a in load_universe() if a.get("scheduler_enabled", False)]
 
 
+def real_time_assets() -> List[Dict]:
+    """Assets that need near real-time updates (every 15 min). ~100 max."""
+    return [a for a in load_universe() if a.get("update_frequency") == "real_time"]
+
+
+def daily_assets() -> List[Dict]:
+    """Assets updated once per day (earnings tier). ~1500."""
+    return [a for a in load_universe() if a.get("update_frequency") == "daily"]
+
+
+def weekly_assets() -> List[Dict]:
+    """Assets updated once per week."""
+    return [a for a in load_universe() if a.get("update_frequency") == "weekly"]
+
+
 # ───────────────────────────────────────────────────────────────
 # Compatibility layer – restore old Asset-style interface (Phase 1)
 # Remove this in Phase 2 once all consumers are migrated
