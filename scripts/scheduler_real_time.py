@@ -2,6 +2,9 @@
 """
 Real-time scheduler – core regime symbols only.
 
+100% Parquet for bars: reads (last_ts/cursor) and writes from Parquet via BarsProvider.
+State (latest_state, state_history) still written to regime_cache.db.
+
 Loop:
   1) For each asset in real_time_assets():
        - Skip US equities outside US trading hours (RTH)
@@ -142,8 +145,8 @@ def values_to_pl_df(values: List[Dict]) -> pl.DataFrame:
     return df
 
 
-def fetch_incremental_symbol(conn: sqlite3.Connection, symbol: str, vendor_symbol: str) -> Tuple[int, int]:
-    """Fetch new bars from API and append to Parquet via BarsProvider."""
+def fetch_incremental_symbol(symbol: str, vendor_symbol: str) -> Tuple[int, int]:
+    """Fetch new bars from API and append to Parquet via BarsProvider. Reads last_ts from Parquet."""
     total = 0
     polled = 0
     for tf in TIMEFRAMES:
@@ -305,7 +308,7 @@ def main():
                     sym = leg.symbol.upper()
                     vend = (leg.vendor_symbol or leg.symbol).upper()
 
-                    inserted, polled = fetch_incremental_symbol(conn, sym, vend)
+                    inserted, polled = fetch_incremental_symbol(sym, vend)
                     total_polled += polled
                     total_inserted += inserted
                     if inserted > 0:

@@ -2,7 +2,8 @@
 """
 Earnings scheduler – 1h + 1week bars for earnings tier symbols.
 
-Single run: fetch 1h and 1week bars for all daily_assets(), append to Parquet via BarsProvider.
+100% Parquet for bars: reads (last_ts/cursor) and writes from Parquet via BarsProvider.
+Single run: fetch 1h and 1week bars for all daily_assets(), append to Parquet.
 No RTH check – runs once per day (cron) or on demand.
 Only 1h and 1week (not 15min, 4h, 1d) for earnings assets.
 
