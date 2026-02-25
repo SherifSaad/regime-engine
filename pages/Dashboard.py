@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from core.assets_registry import real_time_assets, LegacyAsset, assets_by_class, get_asset
+from core.assets_registry import core_assets, LegacyAsset, assets_by_class, get_asset
 from core.engine import get_snapshot
 from core.timeframes import TIMEFRAME_OPTIONS
 
@@ -309,10 +309,10 @@ if sym_col is None:
     st.error("release summary must contain a symbol/ticker/asset column.")
     st.stop()
 
-real_time_list = real_time_assets()
-symbols = [a["symbol"] for a in real_time_list]
+core_list = core_assets()
+symbols = [a["symbol"] for a in core_list]
 print(f"Dashboard loading {len(symbols)} real-time core symbols: {symbols}")
-assets = [LegacyAsset.from_dict(a) for a in real_time_list]
+assets = [LegacyAsset.from_dict(a) for a in core_list]
 by_class = assets_by_class(assets)
 
 with st.sidebar:

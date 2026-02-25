@@ -1,0 +1,4 @@
+[validate] ERROR: live.db not found: data/assets/GOOG/live.db
+
+>>> python3 scripts/validate_asset_bars.py --symbol GOOG
+

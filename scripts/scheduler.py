@@ -2,6 +2,10 @@
 """
 Central Scheduler (Multi-Asset)
 
+DEPRECATED: Use scheduler_core.py (core assets) and scheduler_daily.py
+(daily/earnings assets) instead. Those use Parquet + canonical compute → compute.db.
+This script uses regime_cache.db (deprecated).
+
 Loop:
   1) For each asset in core.assets_registry.real_time_assets():
        - for each timeframe: if should_poll(symbol, timeframe) is True:

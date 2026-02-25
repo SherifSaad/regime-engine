@@ -15,13 +15,15 @@ Output:
 import os
 import json
 import sqlite3
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 
-DB_PATH = os.getenv(
-    "REGIME_DB_PATH",
-    "/Users/sherifsaad/Documents/regime-engine/data/regime_cache.db"
-)
+# Per-asset compute.db (canonical state source)
+from core.storage import get_compute_db_path
+DEFAULT_DB = get_compute_db_path("SPY")
+DB_PATH = os.getenv("VALIDATION_COMPUTE_DB") or os.getenv("REGIME_DB_PATH") or str(DEFAULT_DB)
 
 EVENTS_CSV = "validation_outputs/spy_events.csv"
 
@@ -81,7 +83,11 @@ def main():
     states = load_state_history_daily(SYMBOL, TIMEFRAME)
 
     if states.empty:
-        raise RuntimeError("No rows found in state_history for SPY 1day. Run compute_spy_states.py first.")
+        raise RuntimeError(
+            "No rows found in state_history for SPY 1day. "
+            "Run pipeline: ingest → validate → freeze → compute. "
+            "Or: python scripts/compute_asset_full.py --symbol SPY -t 1day (requires frozen bars)"
+        )
 
     results = []
 

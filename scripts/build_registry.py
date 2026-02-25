@@ -290,12 +290,52 @@ def main() -> None:
 
     asset_classes = sorted(c for c in totals["asset_classes_seen"] if c != "UNKNOWN")
 
+    assets = [it.to_dict() for it in items]
+
+    # 1) Earnings universe comes from universe_plan.json (default membership)
+    universe_plan_path = REPO_ROOT / "data" / "index" / "universe_plan.json"
+    earnings_set = set()
+    if universe_plan_path.exists():
+        plan = json.loads(universe_plan_path.read_text(encoding="utf-8"))
+        for row in plan.get("symbols", []):
+            s = (row.get("symbol") or "").strip().upper()
+            if s:
+                earnings_set.add(s)
+
+    # 2) Core universe comes from repo_root/core_symbols.txt (explicit override)
+    core_path = REPO_ROOT / "core_symbols.txt"
+    core_set = set()
+    if core_path.exists():
+        for raw in core_path.read_text(encoding="utf-8").splitlines():
+            s = raw.strip().upper()
+            if s and not s.startswith("#"):
+                core_set.add(s)
+
+    # 3) Attach capabilities per asset (no hardcoding of symbols in code)
+    for a in assets:
+        sym = (a.get("symbol") or "").strip().upper()
+
+        earnings = sym in earnings_set
+        core = sym in core_set
+
+        # Enforce hierarchy: core => earnings
+        if core and not earnings:
+            earnings = True
+
+        a["capabilities"] = {
+            "earnings_module": bool(earnings),
+            "core_engine": bool(core),
+        }
+
     registry = {
         "generated_utc": utc_now_iso(),
-        "assets": [it.to_dict() for it in items],
+        "assets": assets,
         "asset_classes": asset_classes,
         "timeframes": sorted(totals["timeframes_seen"]),
     }
+
+    core_count = sum(1 for a in assets if a.get("capabilities", {}).get("core_engine"))
+    earnings_count = sum(1 for a in assets if a.get("capabilities", {}).get("earnings_module"))
 
     stats = {
         "generated_utc": utc_now_iso(),
@@ -308,6 +348,8 @@ def main() -> None:
         "calc_units_total": totals["calc_units_total"],
         "asset_classes": asset_classes,
         "timeframes": sorted(totals["timeframes_seen"]),
+        "core_count": core_count,
+        "earnings_count": earnings_count,
     }
 
     (INDEX_DIR / "registry.json").write_text(

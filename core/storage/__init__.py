@@ -1,11 +1,27 @@
 # core/storage/__init__.py
+"""
+Storage utilities.
+
+DEPRECATED for state: regime_cache.db is deprecated. Use get_compute_db_path(symbol)
+and read from data/assets/{symbol}/compute.db (latest_state, state_history) instead.
+Bars: use BarsProvider / Parquet (data/assets/{symbol}/bars/{tf}).
+
+Legacy: get_conn(), init_db() for regime_cache.db. Only used by scheduler.py,
+scheduler_spy.py (deprecated). Prefer scheduler_core + scheduler_daily.
+"""
 from __future__ import annotations
 
 import os
 import sqlite3
 from pathlib import Path
 
-DB_PATH = os.environ.get("REGIME_DB_PATH", "data/regime_cache.db")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DB_PATH = os.environ.get("REGIME_DB_PATH", str(PROJECT_ROOT / "data" / "regime_cache.db"))
+
+
+def get_compute_db_path(symbol: str) -> Path:
+    """Canonical compute.db path for symbol. Single source of truth for state."""
+    return PROJECT_ROOT / "data" / "assets" / symbol / "compute.db"
 
 
 def get_conn() -> sqlite3.Connection:

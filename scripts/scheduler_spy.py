@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """
+DEPRECATED: Use scheduler_core.py instead. This script uses regime_cache.db (deprecated).
+
 SPY centralized scheduler (single-process):
 
 Loop:

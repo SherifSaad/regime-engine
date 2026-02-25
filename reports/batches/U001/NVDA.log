@@ -1,0 +1,249 @@
+[validate] OK: 15min 42063 bars
+[validate] OK: 1day 6811 bars
+[validate] OK: 1h 12486 bars
+[validate] OK: 1week 1414 bars
+[validate] OK: 4h 3502 bars
+[validate] total bars: 66276
+[freeze] Already exists: data/assets/NVDA/frozen_2026-02-23.db (skipping)
+[compute_asset_full] symbol=NVDA read=data/assets/NVDA/frozen_2026-02-23.db write=data/assets/NVDA/compute.db
+
+--- 1day ---
+  escalation: 6811 rows
+  [WARN] bar 19 asof=1999-02-19: Not enough history for the chosen windows.
+  [WARN] bar 20 asof=1999-02-22: Not enough history for the chosen windows.
+  [WARN] bar 21 asof=1999-02-23: Not enough history for the chosen windows.
+  [WARN] bar 22 asof=1999-02-24: Not enough history for the chosen windows.
+  [WARN] bar 23 asof=1999-02-25: Not enough history for the chosen windows.
+  [WARN] bar 24 asof=1999-02-26: Not enough history for the chosen windows.
+  [WARN] bar 25 asof=1999-03-01: Not enough history for the chosen windows.
+  [WARN] bar 26 asof=1999-03-02: Not enough history for the chosen windows.
+  [WARN] bar 27 asof=1999-03-03: Not enough history for the chosen windows.
+  [WARN] bar 28 asof=1999-03-04: Not enough history for the chosen windows.
+  [WARN] bar 29 asof=1999-03-05: Not enough history for the chosen windows.
+  [WARN] bar 30 asof=1999-03-08: Not enough history for the chosen windows.
+  state progress: i=211/6811 wrote=50 skipped=150
+  state progress: i=261/6811 wrote=100 skipped=150
+
+>>> python3 scripts/validate_asset_bars.py --symbol NVDA
+
+>>> python3 scripts/freeze_asset_db.py --symbol NVDA
+
+>>> python3 scripts/compute_asset_full.py --symbol NVDA -t 1day
+
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py:73: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return _dt.datetime.utcnow().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+Traceback (most recent call last):
+  File "/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py", line 465, in <module>
+    main()
+    ~~~~^^
+  File "/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py", line 451, in main
+    w, s = run_state_tf(conn_read, conn_write, symbol, tf)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py", line 345, in run_state_tf
+    conn_write.execute(
+    ~~~~~~~~~~~~~~~~~~^
+        "INSERT OR IGNORE INTO state_history(symbol,timeframe,asof,state_json) VALUES(?,?,?,?)",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        (symbol, tf, asof, state_json),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+sqlite3.OperationalError: database is locked

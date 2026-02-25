@@ -1,0 +1,34 @@
+[validate] OK: 15min 41905 bars
+[validate] OK: 1day 11388 bars
+[validate] OK: 1h 12487 bars
+[validate] OK: 1week 2358 bars
+[validate] OK: 4h 3481 bars
+[validate] total bars: 71619
+[freeze] Already exists: data/assets/AAPL/frozen_2026-02-23.db (skipping)
+[compute_asset_full] symbol=AAPL read=data/assets/AAPL/frozen_2026-02-23.db write=data/assets/AAPL/compute.db
+
+--- 1day ---
+
+>>> python3 scripts/validate_asset_bars.py --symbol AAPL
+
+>>> python3 scripts/freeze_asset_db.py --symbol AAPL
+
+>>> python3 scripts/compute_asset_full.py --symbol AAPL -t 1day
+
+Traceback (most recent call last):
+  File "/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py", line 465, in <module>
+    main()
+    ~~~~^^
+  File "/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py", line 448, in main
+    n_esc = run_escalation_tf(conn_read, conn_write, symbol, tf)
+  File "/Users/sherifsaad/Documents/regime-engine/scripts/compute_asset_full.py", line 293, in run_escalation_tf
+    conn_write.executemany(
+    ~~~~~~~~~~~~~~~~~~~~~~^
+        """
+        ^^^
+    ...<10 lines>...
+        rows,
+        ^^^^^
+    )
+    ^
+sqlite3.OperationalError: database is locked

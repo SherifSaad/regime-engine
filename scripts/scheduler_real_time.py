@@ -1,27 +1,24 @@
 #!/usr/bin/env python3
 """
-Real-time scheduler – core regime symbols only.
+DEPRECATED: Use scheduler_core.py instead. Poll every 15 min.
 
 100% Parquet for bars: reads (last_ts/cursor) and writes from Parquet via BarsProvider.
-State (latest_state, state_history) still written to regime_cache.db.
+Canonical compute: invokes compute_asset_full (Parquet input, full history) → compute.db.
 
 Loop:
   1) For each asset in real_time_assets():
        - Skip US equities outside US trading hours (RTH)
        - Fetch incremental bars (overlap) -> append to Parquet via BarsProvider
-  2) If ANY new bars inserted -> compute ALL 5 TF states (read from Parquet, write state to regime_cache.db)
+  2) If ANY new bars inserted -> run canonical compute (compute_asset_full) → compute.db
   3) Sleep and repeat
 
 Notes:
 - TWELVEDATA_API_KEY required in .env
-- REGIME_DB_PATH optional
-- REGIME_LOOKBACK optional (default 2000)
 """
 
-import json
 import logging
 import os
-import sqlite3
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -31,23 +28,10 @@ from threading import Thread
 from typing import Dict, List, Optional, Tuple
 
 import requests
-
-import pandas as pd
 import polars as pl
 from dotenv import load_dotenv
 
-from regime_engine.cli import compute_market_state_from_df
-
-from core.assets_registry import real_time_assets, LegacyAsset
-from core.compute.regime_engine_polars import (
-    CODE_VERSION,
-    RAW_COLS,
-    compute_regime_polars,
-    compute_regime_polars_incremental,
-    load_regime_cache,
-    persist_regime_cache,
-    polars_result_to_state,
-)
+from core.assets_registry import core_assets, LegacyAsset
 from core.asset_class_rules import should_poll
 from core.providers.bars_provider import BarsProvider
 from core.utils.config_watcher import check_and_clear_universe_changed, start_universe_watcher
@@ -70,34 +54,21 @@ logging.basicConfig(
 
 TIMEFRAMES = ["15min", "1h", "4h", "1day", "1week"]
 TD_TS_URL = "https://api.twelvedata.com/time_series"
-DEFAULT_DB_PATH = str(PROJECT_ROOT / "data" / "regime_cache.db")
 
 OVERLAP_BARS = 5
-DEFAULT_LOOKBACK = int(os.getenv("REGIME_LOOKBACK", "2000"))
-SLEEP_SEC = 30
+SLEEP_SEC = 900  # 15 min
 RATE_LIMIT_SLEEP = 65
+COMPUTE_SCRIPT = Path(__file__).resolve().parent / "compute_asset_full.py"
 
 # ----------------------------
 # Helpers
 # ----------------------------
-
-def now_utc_iso() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 def api_key() -> str:
     k = os.getenv("TWELVEDATA_API_KEY", "").strip()
     if not k:
         raise RuntimeError("Missing TWELVEDATA_API_KEY (check .env)")
     return k
-
-def db_path() -> str:
-    return os.getenv("REGIME_DB_PATH", DEFAULT_DB_PATH)
-
-def connect(db: str) -> sqlite3.Connection:
-    conn = sqlite3.connect(db)
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA synchronous=NORMAL;")
-    return conn
 
 def td_time_series(symbol: str, interval: str, start_date: Optional[str]) -> List[Dict]:
     params = {
@@ -202,212 +173,95 @@ def fetch_incremental_symbol(symbol: str, vendor_symbol: str) -> Tuple[int, int]
 
     return total, polled
 
-def load_bars_df_from_parquet(symbol: str, tf: str, limit: int) -> pd.DataFrame:
-    """Load bars from Parquet for compute. Returns pandas DataFrame with ts index."""
-    lf = BarsProvider.get_bars(symbol, tf)
-    pl_df = lf.sort("ts", descending=True).head(limit).collect()
-    if pl_df.is_empty():
-        return pd.DataFrame()
-    df = pd.DataFrame(pl_df.to_dicts())
-    df["ts"] = pd.to_datetime(df["ts"])
-    df = df.sort_values("ts").reset_index(drop=True)
-    return df
-
-
-def get_latest_bar_ts_from_parquet(symbol: str, tf: str) -> Optional[str]:
-    """Get latest bar ts from Parquet."""
-    lf = BarsProvider.get_bars(symbol, tf)
-    row = lf.select(pl.col("ts").max()).collect()
-    if row.is_empty() or row[0, 0] is None:
-        return None
-    return str(row[0, 0])
-
-def upsert_latest_state(conn: sqlite3.Connection, symbol: str, tf: str, asof: str, state: Dict) -> None:
-    state_json = json.dumps(state, separators=(",", ":"), ensure_ascii=False)
-    updated_at = now_utc_iso()
-    conn.execute(
-        """
-        INSERT INTO latest_state(symbol,timeframe,asof,state_json,updated_at)
-        VALUES(?,?,?,?,?)
-        ON CONFLICT(symbol,timeframe) DO UPDATE SET
-            asof=excluded.asof,
-            state_json=excluded.state_json,
-            updated_at=excluded.updated_at;
-        """,
-        (symbol, tf, asof, state_json, updated_at),
-    )
-
-def insert_state_history(conn: sqlite3.Connection, symbol: str, tf: str, asof: str, state: Dict) -> None:
-    state_json = json.dumps(state, separators=(",", ":"), ensure_ascii=False)
-    conn.execute(
-        """
-        INSERT OR IGNORE INTO state_history(symbol,timeframe,asof,state_json)
-        VALUES(?,?,?,?);
-        """,
-        (symbol, tf, asof, state_json),
-    )
-
-def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: int) -> None:
-    """Read bars from Parquet, compute state via Polars (incremental + cache), persist to regime_cache.db."""
-    for tf in TIMEFRAMES:
-        latest_ts = get_latest_bar_ts_from_parquet(symbol, tf)
-        if not latest_ts:
-            continue
-
-        t0 = time.time()
-        cache_status = "MISS"
-        try:
-            lf = BarsProvider.get_bars(symbol, tf)
-            pl_df = lf.sort("ts", descending=True).head(lookback).collect()
-            if pl_df.is_empty() or len(pl_df) < 200:
-                continue
-            pl_df = pl_df.select([c for c in RAW_COLS if c in pl_df.columns]).sort("ts")
-
-            n_rows = len(pl_df)
-            prev_result, prev_meta = load_regime_cache(symbol, tf)
-            cache_key = f"{latest_ts}_{n_rows}_{CODE_VERSION}"[:32]  # short fingerprint for log
-
-            # Cache hit: same last_ts, n_rows, code_version
-            if prev_meta and prev_result is not None:
-                if (
-                    prev_meta.get("last_bar_ts") == latest_ts
-                    and prev_meta.get("n_rows") == n_rows
-                    and prev_meta.get("code_version") == CODE_VERSION
-                ):
-                    cache_status = "HIT"
-                    result_df = prev_result
-                    state = polars_result_to_state(result_df, symbol, tf)
-                    if state:
-                        asof = state.get("asof", latest_ts)
-                        upsert_latest_state(conn, symbol, tf, asof, state)
-                        insert_state_history(conn, symbol, tf, asof, state)
-                        conn.commit()
-                        duration = time.time() - t0
-                        print(f"[{symbol} {tf}] Compute: {cache_status}, {duration:.2f}s")
-                        continue
-
-            # Compute: incremental if we have previous + new bars, else full
-            if prev_result is not None and not prev_result.is_empty():
-                prev_max_ts = prev_result["ts"].max()
-                new_bars = pl_df.filter(pl.col("ts") > prev_max_ts)
-                if len(new_bars) > 0 and len(pl_df) >= len(prev_result):
-                    result_df = compute_regime_polars_incremental(new_bars, prev_result, CODE_VERSION)
-                else:
-                    result_df = compute_regime_polars(pl_df)
-            else:
-                result_df = compute_regime_polars(pl_df)
-
-            state = polars_result_to_state(result_df, symbol, tf)
-            if not state:
-                continue
-
-            asof = state.get("asof", latest_ts)
-            upsert_latest_state(conn, symbol, tf, asof, state)
-            insert_state_history(conn, symbol, tf, asof, state)
-            conn.commit()
-            persist_regime_cache(symbol, tf, result_df, latest_ts, len(result_df), CODE_VERSION)
-            duration = time.time() - t0
-            print(f"[{symbol} {tf}] Compute: {cache_status}, {duration:.2f}s")
-        except Exception as e:
-            duration = time.time() - t0
-            logging.exception("[%s %s] Polars failed: %s", symbol, tf, e)
-            print(f"[{symbol} {tf}] Compute: ERROR, {duration:.2f}s – {e}", file=sys.stderr)
-            try:
-                df = load_bars_df_from_parquet(symbol, tf, lookback)
-                if df.empty or len(df) < 200:
-                    continue
-                df = df.set_index("ts")
-                df.index = pd.to_datetime(df.index)
-                if "adj_close" not in df.columns:
-                    df["adj_close"] = df["close"]
-                for c in ["open", "high", "low", "close", "adj_close", "volume"]:
-                    if c in df.columns:
-                        df[c] = pd.to_numeric(df[c], errors="coerce")
-                df = df.dropna(subset=["close"])
-                state = compute_market_state_from_df(df, symbol, diagnostics=False, include_escalation_v2=True)
-                state["timeframe"] = tf
-                asof = state.get("asof", latest_ts)
-                upsert_latest_state(conn, symbol, tf, asof, state)
-                insert_state_history(conn, symbol, tf, asof, state)
-                conn.commit()
-                duration = time.time() - t0
-                print(f"[{symbol} {tf}] Compute: {cache_status} (legacy fallback), {duration:.2f}s")
-            except Exception as e2:
-                duration = time.time() - t0
-                logging.exception("[%s %s] Legacy fallback failed: %s", symbol, tf, e2)
-                print(f"[{symbol} {tf}] Compute: ERROR, {duration:.2f}s – {e2}", file=sys.stderr)
+def run_canonical_compute(symbol: str) -> bool:
+    """Run canonical compute (compute_asset_full, Parquet input, full history) → compute.db."""
+    t0 = time.time()
+    try:
+        result = subprocess.run(
+            [sys.executable, str(COMPUTE_SCRIPT), "--symbol", symbol, "--input", "parquet"],
+            cwd=str(Path(__file__).resolve().parent.parent),
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        duration = time.time() - t0
+        if result.returncode == 0:
+            print(f"[{symbol}] Canonical compute OK, {duration:.2f}s")
+            return True
+        logging.warning("[%s] compute_asset_full failed: %s", symbol, result.stderr)
+        print(f"[{symbol}] Compute: ERROR, {duration:.2f}s – {result.stderr[:200]}", file=sys.stderr)
+        return False
+    except subprocess.TimeoutExpired:
+        duration = time.time() - t0
+        logging.exception("[%s] compute_asset_full timeout", symbol)
+        print(f"[{symbol}] Compute: TIMEOUT, {duration:.2f}s", file=sys.stderr)
+        return False
+    except Exception as e:
+        duration = time.time() - t0
+        logging.exception("[%s] Compute failed: %s", symbol, e)
+        print(f"[{symbol}] Compute: ERROR, {duration:.2f}s – {e}", file=sys.stderr)
+        return False
 
 # ----------------------------
 # Main loop
 # ----------------------------
 
 def main():
-    db = db_path()
-    os.makedirs(os.path.dirname(db), exist_ok=True)
-
     # Start universe.json watcher in background
     watcher_thread = Thread(target=start_universe_watcher, daemon=True)
     watcher_thread.start()
 
-    real_time_list = real_time_assets()
-    real_time_symbols = [a["symbol"] for a in real_time_list]
-    print("DB:", db)
-    print("LOOKBACK:", DEFAULT_LOOKBACK)
-    print(f"Scheduler (real-time only): processing {len(real_time_symbols)} symbols: {real_time_symbols}")
+    core_list = core_assets()
+    core_symbols = [a["symbol"] for a in core_list]
+    print(f"Scheduler (core): canonical compute → compute.db")
+    print(f"Processing {len(core_symbols)} symbols: {core_symbols}")
     print("TFs:", ", ".join(TIMEFRAMES))
     print("Scheduler starting...\n")
-
-    try:
-        from core.storage import init_db  # type: ignore
-        init_db()
-    except Exception:
-        pass
 
     while True:
         try:
             # Reload universe if universe.json changed
             if check_and_clear_universe_changed():
-                real_time_list = real_time_assets()
-                real_time_symbols = [a["symbol"] for a in real_time_list]
-                print(f"[CONFIG] Reloaded universe: {len(real_time_symbols)} symbols: {real_time_symbols}\n")
+                core_list = core_assets()
+                core_symbols = [a["symbol"] for a in core_list]
+                print(f"[CONFIG] Reloaded universe: {len(core_symbols)} symbols: {core_symbols}\n")
 
             now_est = datetime.now(ZoneInfo("America/New_York"))
             is_us_trading_day = now_est.weekday() < 5
             is_us_trading_hours = 9 <= now_est.hour < 16
 
-            with connect(db) as conn:
-                changed_symbols: List[str] = []
-                total_polled = 0
-                total_inserted = 0
+            changed_symbols: List[str] = []
+            total_polled = 0
+            total_inserted = 0
 
-                for asset in real_time_list:
-                    symbol = asset["symbol"]
-                    asset_class = asset.get("asset_class", "")
-                    if "US_EQUITY" in asset_class and (not is_us_trading_day or not is_us_trading_hours):
-                        print(f"Skipping {symbol} – outside US trading hours")
-                        continue
+            for asset in core_list:
+                symbol = asset["symbol"]
+                asset_class = asset.get("asset_class", "")
+                if "US_EQUITY" in asset_class and (not is_us_trading_day or not is_us_trading_hours):
+                    print(f"Skipping {symbol} – outside US trading hours")
+                    continue
 
-                    leg = LegacyAsset.from_dict(asset)
-                    sym = leg.symbol.upper()
-                    vend = (leg.vendor_symbol or leg.symbol).upper()
+                leg = LegacyAsset.from_dict(asset)
+                sym = leg.symbol.upper()
+                vend = (leg.vendor_symbol or leg.symbol).upper()
 
-                    inserted, polled = fetch_incremental_symbol(sym, vend)
-                    total_polled += polled
-                    total_inserted += inserted
-                    if inserted > 0:
-                        changed_symbols.append(sym)
+                inserted, polled = fetch_incremental_symbol(sym, vend)
+                total_polled += polled
+                total_inserted += inserted
+                if inserted > 0:
+                    changed_symbols.append(sym)
 
-                for sym in changed_symbols:
-                    print(f"\n[PIPELINE] {sym} new bars detected -> computing ALL TFs...")
-                    compute_and_persist_symbol(conn, sym, DEFAULT_LOOKBACK)
+            for sym in changed_symbols:
+                print(f"\n[PIPELINE] {sym} new bars detected -> canonical compute...")
+                run_canonical_compute(sym)
 
-                if not changed_symbols:
-                    if total_polled == 0:
-                        print(f"[PIPELINE] Session-gated: no TFs polled. Sleeping {SLEEP_SEC}s.\n")
-                    else:
-                        print(f"[PIPELINE] Polled={total_polled} calls, inserted={total_inserted}. No new bars. Sleeping {SLEEP_SEC}s.\n")
+            if not changed_symbols:
+                if total_polled == 0:
+                    print(f"[PIPELINE] Session-gated: no TFs polled. Sleeping {SLEEP_SEC}s.\n")
                 else:
-                    print(f"\n[PIPELINE] Updated symbols: {', '.join(changed_symbols)} | polled={total_polled} inserted={total_inserted}. Sleeping {SLEEP_SEC}s.\n")
+                    print(f"[PIPELINE] Polled={total_polled} calls, inserted={total_inserted}. No new bars. Sleeping {SLEEP_SEC}s.\n")
+            else:
+                print(f"\n[PIPELINE] Updated symbols: {', '.join(changed_symbols)} | polled={total_polled} inserted={total_inserted}. Sleeping {SLEEP_SEC}s.\n")
 
             time.sleep(SLEEP_SEC)
 

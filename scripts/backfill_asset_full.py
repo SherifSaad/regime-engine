@@ -1,6 +1,6 @@
-"""Full backfill for real-time core symbols from Twelve Data into per-asset SQLite DB.
+"""Full backfill for core symbols from Twelve Data into per-asset SQLite DB.
 
-- Reads assets from universe.json via core.assets_registry.real_time_assets()
+- Reads assets from universe.json via core.assets_registry.core_assets()
 - Uses provider_symbol (e.g., "EUR/USD", "BTC/USD") for Twelve Data calls
 - Writes to: data/assets/{SYMBOL}/live.db
 - Canonical timeframes: 15min, 1h, 4h, 1day, 1week
@@ -12,8 +12,11 @@ Important:
 
 Run:
   python scripts/backfill_asset_full.py
+  python scripts/backfill_asset_full.py --symbol NVDA
+  python scripts/backfill_asset_full.py --skip AAPL SPY   # skip already-done symbols
 """
 
+import argparse
 import json
 import os
 import sqlite3
@@ -24,7 +27,7 @@ from typing import Dict, List, Optional, Tuple
 import requests
 from dotenv import load_dotenv
 
-from core.assets_registry import real_time_assets
+from core.assets_registry import core_assets
 
 load_dotenv()
 
@@ -378,9 +381,24 @@ def write_inventory(symbol: str, conn: sqlite3.Connection) -> None:
 
 
 def main():
-    assets_to_backfill = real_time_assets()
-    symbols = [a["symbol"] for a in assets_to_backfill]
-    print(f"Backfilling {len(symbols)} real-time core symbols: {symbols}")
+    ap = argparse.ArgumentParser(description="Backfill core symbols to live.db")
+    ap.add_argument("--symbol", help="Single symbol only (e.g. AAPL). Default: all core symbols")
+    ap.add_argument("--skip", nargs="+", help="Symbols to skip (e.g. --skip AAPL SPY)")
+    args = ap.parse_args()
+
+    assets_to_backfill = core_assets()
+    skip_set = {s.strip().upper() for s in (args.skip or [])}
+    if args.symbol:
+        sym = args.symbol.strip().upper()
+        assets_to_backfill = [a for a in assets_to_backfill if a["symbol"] == sym]
+        if not assets_to_backfill:
+            print(f"Symbol {sym} not in core_assets(). Exiting.")
+            return
+        print(f"Backfilling 1 symbol: {sym}")
+    else:
+        assets_to_backfill = [a for a in assets_to_backfill if a["symbol"] not in skip_set]
+        symbols = [a["symbol"] for a in assets_to_backfill]
+        print(f"Backfilling {len(symbols)} core symbols: {symbols}")
 
     for asset in assets_to_backfill:
         symbol = asset["symbol"]

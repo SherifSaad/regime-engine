@@ -9,17 +9,16 @@ absolute move over N bars >= ATR_MULT × ATR
 Output:
 - prints event count
 - saves events dataframe (for later stages)
+
+Bars: read from Parquet (canonical). No regime_cache.
 """
 
 import os
-import sqlite3
 import pandas as pd
 import numpy as np
+from pathlib import Path
 
-DB_PATH = os.getenv(
-    "REGIME_DB_PATH",
-    "/Users/sherifsaad/Documents/regime-engine/data/regime_cache.db"
-)
+from core.providers.bars_provider import BarsProvider
 
 SYMBOL = "SPY"
 TIMEFRAME = "1day"
@@ -30,22 +29,16 @@ LOOKAHEAD_BARS = 20
 
 
 def load_bars():
-    conn = sqlite3.connect(DB_PATH)
-    rows = conn.execute(
-        """
-        SELECT ts, open, high, low, close
-        FROM bars
-        WHERE symbol=? AND timeframe=?
-        ORDER BY ts ASC
-        """,
-        (SYMBOL, TIMEFRAME),
-    ).fetchall()
-    conn.close()
-
-    df = pd.DataFrame(rows, columns=["ts","open","high","low","close"])
+    """Load bars from Parquet (canonical source)."""
+    lf = BarsProvider.get_bars(SYMBOL, TIMEFRAME)
+    pl_df = lf.sort("ts").collect()
+    if pl_df.is_empty():
+        return pd.DataFrame()
+    df = pd.DataFrame({c: pl_df[c].to_numpy() for c in pl_df.columns})
     df["ts"] = pd.to_datetime(df["ts"])
     df = df.set_index("ts")
-    return df
+    df = df[["open", "high", "low", "close"]]
+    return df.sort_index()
 
 
 def compute_atr(df):
@@ -85,7 +78,7 @@ def main():
     print(f"Bars loaded: {len(df)}")
     print(f"Events detected: {len(events)}")
 
-    out_path = "validation_outputs/sp y_events.csv".replace(" ", "")
+    out_path = "validation_outputs/spy_events.csv"
     os.makedirs("validation_outputs", exist_ok=True)
     events.to_csv(out_path)
 

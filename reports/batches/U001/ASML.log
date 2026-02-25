@@ -1,0 +1,4 @@
+Symbol ASML not in core_assets(). Exiting.
+
+>>> python3 scripts/backfill_asset_full.py --symbol ASML
+

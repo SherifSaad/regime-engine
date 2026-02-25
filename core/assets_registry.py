@@ -31,9 +31,14 @@ def scheduler_assets() -> List[Dict]:
     return [a for a in load_universe() if a.get("scheduler_enabled", False)]
 
 
+def core_assets() -> List[Dict]:
+    """Core assets: poll every 15 min. (update_frequency=15min). ~100 max."""
+    return [a for a in load_universe() if a.get("update_frequency") in ("15min", "real_time")]
+
+
 def real_time_assets() -> List[Dict]:
-    """Assets that need near real-time updates (every 15 min). ~100 max."""
-    return [a for a in load_universe() if a.get("update_frequency") == "real_time"]
+    """Deprecated: use core_assets(). Alias for backward compat."""
+    return core_assets()
 
 
 def daily_assets() -> List[Dict]:

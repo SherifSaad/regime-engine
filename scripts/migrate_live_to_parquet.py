@@ -2,12 +2,12 @@
 """
 Migrate bars from per-asset live.db to Parquet storage.
 
-Reads bars from data/assets/{SYMBOL}/live.db and writes to data/bars/{SYMBOL}/{timeframe}/
+Reads bars from data/assets/{SYMBOL}/live.db and writes to data/assets/{SYMBOL}/bars/{timeframe}/
 as partitioned Parquet (by date).
 
 Usage:
   python scripts/migrate_live_to_parquet.py [--symbol SPY]
-  python scripts/migrate_live_to_parquet.py --all   # migrate all real_time_assets()
+  python scripts/migrate_live_to_parquet.py --all   # migrate all core + daily
 """
 
 import argparse
@@ -16,18 +16,19 @@ from pathlib import Path
 
 import polars as pl
 
-from core.assets_registry import real_time_assets
+from core.assets_registry import core_assets, daily_assets
 from core.providers.bars_provider import BarsProvider
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 TIMEFRAMES = ["15min", "1h", "4h", "1day", "1week"]
 
 
-def migrate_symbol(symbol: str) -> int:
+def migrate_symbol(symbol: str, quiet: bool = False) -> int:
     """Migrate one symbol's bars from live.db to Parquet. Returns total rows migrated."""
     db_path = PROJECT_ROOT / "data" / "assets" / symbol / "live.db"
     if not db_path.exists():
-        print(f"SKIP {symbol}: live.db not found at {db_path}")
+        if not quiet:
+            print(f"SKIP {symbol}: live.db not found")
         return 0
 
     conn = sqlite3.connect(str(db_path))
@@ -66,21 +67,27 @@ def migrate_symbol(symbol: str) -> int:
 def main():
     ap = argparse.ArgumentParser(description="Migrate live.db bars to Parquet")
     ap.add_argument("--symbol", help="Single symbol to migrate (e.g. SPY)")
-    ap.add_argument("--all", action="store_true", help="Migrate all real-time core symbols")
+    ap.add_argument("--all", action="store_true", help="Migrate all core + daily symbols")
+    ap.add_argument("-q", "--quiet", action="store_true", help="Skip symbols without live.db silently")
     args = ap.parse_args()
 
     if args.all:
-        assets = real_time_assets()
-        symbols = [a["symbol"] for a in assets]
-        print(f"Migrating {len(symbols)} real-time symbols: {symbols}")
+        core = core_assets()
+        daily = daily_assets()
+        symbols = list({a["symbol"] for a in core + daily})
+        have_db = [s for s in symbols if (PROJECT_ROOT / "data" / "assets" / s / "live.db").exists()]
+        print(f"Migrating: {len(have_db)} symbols with live.db (of {len(symbols)} total)")
+        if not have_db:
+            print("Run backfill_asset_full (core) or backfill_asset_partial (daily) first.")
+            return
         grand_total = 0
-        for symbol in symbols:
+        for symbol in have_db:
             try:
-                total = migrate_symbol(symbol)
+                total = migrate_symbol(symbol, quiet=args.quiet)
                 grand_total += total
             except Exception as e:
                 print(f"Error migrating {symbol}: {e}")
-        print(f"Migrated {grand_total} total rows across {len(symbols)} symbols")
+        print(f"Migrated {grand_total} total rows")
     else:
         symbol = (args.symbol or "SPY").strip().upper()
         print(f"Migrating {symbol} bars to Parquet...")
