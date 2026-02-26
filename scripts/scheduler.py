@@ -385,6 +385,7 @@ def compute_and_persist_symbol(conn: sqlite3.Connection, symbol: str, lookback: 
             symbol,
             diagnostics=False,
             include_escalation_v2=True,
+            tf=tf,
         )
         state["timeframe"] = tf
 

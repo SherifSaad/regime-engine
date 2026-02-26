@@ -17,6 +17,7 @@ from pathlib import Path
 import polars as pl
 
 from core.assets_registry import core_assets, daily_assets
+from core.manifest import write_bar_manifest
 from core.providers.bars_provider import BarsProvider
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -61,6 +62,8 @@ def migrate_symbol(symbol: str, quiet: bool = False) -> int:
         print(f"  {symbol} {tf}: {len(df)} rows")
 
     conn.close()
+    if total > 0:
+        write_bar_manifest(symbol)
     return total
 
 

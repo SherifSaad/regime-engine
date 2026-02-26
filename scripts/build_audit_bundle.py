@@ -130,12 +130,13 @@ def main():
     except Exception:
         git_hash = "unknown"
 
-    # 1) Latest state
+    # 1) Latest state (tf=1day: audit bundle uses daily CSV)
     latest_state = compute_market_state_from_df(
         df,
         symbol,
         diagnostics=False,
         include_escalation_v2=bool(args.include_escalation_v2),
+        tf="1day",
     )
 
     latest_payload = {

@@ -1,5 +1,7 @@
 # Architecture & Naming
 
+**Purpose:** Naming conventions for assets, storage, backfill, and schedulers. Reference when adding symbols or changing data flow.
+
 ## Asset lists
 
 | List | Function | update_frequency | Source | Count |

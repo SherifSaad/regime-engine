@@ -1,10 +1,10 @@
-"""Full backfill for core symbols from Twelve Data into per-asset SQLite DB.
+"""Full backfill for core symbols from Twelve Data into Parquet or live.db.
 
 - Reads assets from universe.json via core.assets_registry.core_assets()
 - Uses provider_symbol (e.g., "EUR/USD", "BTC/USD") for Twelve Data calls
-- Writes to: data/assets/{SYMBOL}/live.db
+- Writes to: data/assets/{SYMBOL}/bars/{tf}/ (Parquet, default) or live.db (legacy)
 - Canonical timeframes: 15min, 1h, 4h, 1day, 1week
-- Idempotent inserts into bars (PRIMARY KEY symbol,timeframe,ts)
+- Idempotent: bars deduplicated by ts
 
 Important:
 - Twelve Data outputsize is capped (5000). Forward paging can stall at the most recent 5000 bars.
@@ -14,6 +14,8 @@ Run:
   python scripts/backfill_asset_full.py
   python scripts/backfill_asset_full.py --symbol NVDA
   python scripts/backfill_asset_full.py --skip AAPL SPY   # skip already-done symbols
+  python scripts/backfill_asset_full.py --output parquet   # default
+  python scripts/backfill_asset_full.py --output live      # legacy
 """
 
 import argparse
@@ -24,10 +26,13 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import polars as pl
 import requests
 from dotenv import load_dotenv
 
 from core.assets_registry import core_assets
+from core.manifest import write_bar_manifest
+from core.providers.bars_provider import BarsProvider
 
 load_dotenv()
 
@@ -256,6 +261,160 @@ def insert_values(conn: sqlite3.Connection, symbol: str, tf: str, values: List[D
     return inserted, min_ts, max_ts
 
 
+# ───────────────────────────────────────────────────────────────
+# Parquet output path (--output parquet, default)
+# ───────────────────────────────────────────────────────────────
+
+
+def _values_to_df(values: List[Dict]) -> pl.DataFrame:
+    """Convert API values to Polars DataFrame for BarsProvider."""
+    rows = []
+    for v in values:
+        ts = v.get("datetime")
+        if not ts:
+            continue
+        o = to_float(v.get("open"))
+        h = to_float(v.get("high"))
+        l_ = to_float(v.get("low"))
+        c = to_float(v.get("close"))
+        vol = to_float(v.get("volume"))
+        rows.append({"ts": ts, "open": o or 0, "high": h or 0, "low": l_ or 0, "close": c or 0, "volume": int(vol or 0)})
+    if not rows:
+        return pl.DataFrame(schema={"ts": pl.String, "open": pl.Float64, "high": pl.Float64, "low": pl.Float64, "close": pl.Float64, "volume": pl.Int64})
+    df = pl.DataFrame(rows)
+    df = df.with_columns(pl.col("ts").str.to_datetime())
+    return df
+
+
+def write_values_parquet(symbol: str, tf: str, values: List[Dict]) -> Tuple[int, Optional[str], Optional[str]]:
+    """Write values to Parquet via BarsProvider. Returns (inserted, min_ts, max_ts)."""
+    df = _values_to_df(values)
+    if df.is_empty():
+        return 0, None, None
+    BarsProvider.write_bars(symbol, tf, df)
+    min_ts = df["ts"].min()
+    max_ts = df["ts"].max()
+    return len(df), str(min_ts) if min_ts else None, str(max_ts) if max_ts else None
+
+
+def parquet_stats(symbol: str, tf: str) -> Tuple[Optional[str], Optional[str], int]:
+    """Get min_ts, max_ts, count from Parquet."""
+    df = BarsProvider.get_bars(symbol, tf).collect()
+    if df.is_empty():
+        return None, None, 0
+    min_ts = df["ts"].min()
+    max_ts = df["ts"].max()
+    return str(min_ts), str(max_ts), len(df)
+
+
+def parquet_get_nth_last_ts(symbol: str, tf: str, n: int) -> Optional[str]:
+    df = BarsProvider.get_bars(symbol, tf).collect()
+    if df.is_empty() or len(df) < n:
+        return None
+    row = df.sort("ts", descending=True).row(n - 1, named=True)
+    return str(row["ts"]) if row else None
+
+
+def parquet_get_nth_first_ts(symbol: str, tf: str, n: int) -> Optional[str]:
+    df = BarsProvider.get_bars(symbol, tf).collect()
+    if df.is_empty() or len(df) < n:
+        return None
+    row = df.sort("ts").row(n - 1, named=True)
+    return str(row["ts"]) if row else None
+
+
+def backfill_forward_parquet(symbol: str, provider_symbol: str, tf: str, earliest: str) -> None:
+    min_ts, max_ts, count = parquet_stats(symbol, tf)
+    print(f"\n[{symbol} {tf}] (forward/parquet) provider_symbol={provider_symbol} earliest_vendor={earliest} parquet_min={min_ts} parquet_max={max_ts} count={count}")
+
+    if min_ts and str(min_ts) <= str(earliest):
+        print(f"[{symbol} {tf}] Parquet already contains earliest vendor history. Skipping forward backfill.")
+        return
+
+    start = earliest
+    page = 0
+    prev_max = None
+
+    while True:
+        page += 1
+        values = call_time_series(provider_symbol, tf, start_date=start, order="ASC")
+        if not values:
+            print(f"[{symbol} {tf}] page={page} no values returned. STOP.")
+            break
+
+        inserted, page_min, page_max = write_values_parquet(symbol, tf, values)
+        print(f"[{symbol} {tf}] page={page} fetched={len(values)} wrote={inserted} start={start} page_max={page_max}")
+
+        if len(values) < OUTPUTSIZE:
+            print(f"[{symbol} {tf}] fetched < {OUTPUTSIZE}. Backfill complete.")
+            break
+        if (prev_max is not None) and (page_max == prev_max):
+            print(f"[{symbol} {tf}] page_max did not advance. STOP (safety).")
+            break
+
+        prev_max = page_max
+        overlap_start = parquet_get_nth_last_ts(symbol, tf, OVERLAP_BARS)
+        start = overlap_start or page_max
+        time.sleep(SLEEP_BETWEEN_CALLS_SEC)
+
+
+def backfill_backward_parquet(symbol: str, provider_symbol: str, tf: str, earliest: str) -> None:
+    min_ts, max_ts, count = parquet_stats(symbol, tf)
+    print(f"\n[{symbol} {tf}] (backward/parquet) provider_symbol={provider_symbol} earliest_vendor={earliest} parquet_min={min_ts} parquet_max={max_ts} count={count}")
+
+    if not min_ts:
+        values = call_time_series(provider_symbol, tf, order="DESC")
+        if not values:
+            print(f"[{symbol} {tf}] no values returned. STOP.")
+            return
+        inserted, page_min, page_max = write_values_parquet(symbol, tf, values)
+        if page_max:
+            pass  # no cursor for parquet
+        min_ts, max_ts, count = parquet_stats(symbol, tf)
+        print(f"[{symbol} {tf}] seed_latest fetched={len(values)} wrote={inserted} page_min={page_min} page_max={page_max} parquet_min={min_ts} parquet_max={max_ts} count={count}")
+
+    if min_ts and str(min_ts) <= str(earliest):
+        print(f"[{symbol} {tf}] Parquet already contains earliest vendor history. Skipping backward backfill.")
+        return
+
+    end = min_ts
+    page = 0
+    prev_min = None
+
+    while True:
+        page += 1
+        values = call_time_series(provider_symbol, tf, end_date=end, order="DESC")
+        if not values:
+            print(f"[{symbol} {tf}] page={page} no values returned. STOP.")
+            break
+
+        inserted, page_min, page_max = write_values_parquet(symbol, tf, values)
+        print(f"[{symbol} {tf}] page={page} fetched={len(values)} wrote={inserted} end={end} page_min={page_min} page_max={page_max}")
+
+        if page_min and str(page_min) <= str(earliest):
+            print(f"[{symbol} {tf}] reached earliest boundary. Backfill complete.")
+            break
+
+        if len(values) < OUTPUTSIZE:
+            print(f"[{symbol} {tf}] fetched < {OUTPUTSIZE}. Backfill complete.")
+            break
+
+        if (prev_min is not None) and (page_min == prev_min):
+            print(f"[{symbol} {tf}] page_min did not advance. STOP (safety).")
+            break
+        prev_min = page_min
+
+        overlap_end = parquet_get_nth_first_ts(symbol, tf, OVERLAP_BARS)
+        end = overlap_end or page_min
+
+        min_ts, _, _ = parquet_stats(symbol, tf)
+        if min_ts and str(min_ts) <= str(earliest):
+            print(f"[{symbol} {tf}] parquet_min now <= earliest. Backfill complete.")
+            break
+
+        time.sleep(SLEEP_BETWEEN_CALLS_SEC)
+
+
 def backfill_forward(conn: sqlite3.Connection, symbol: str, provider_symbol: str, tf: str, earliest: str) -> None:
     min_ts, max_ts, count = db_stats(conn, symbol, tf)
     print(f"\n[{symbol} {tf}] (forward) provider_symbol={provider_symbol} earliest_vendor={earliest} db_min={min_ts} db_max={max_ts} db_count={count}")
@@ -380,11 +539,31 @@ def write_inventory(symbol: str, conn: sqlite3.Connection) -> None:
     print(f"\nWROTE inventory: {out}")
 
 
+def write_inventory_parquet(symbol: str) -> None:
+    """Write inventory.json from Parquet stats."""
+    inv = {"symbol": symbol, "updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "timeframes": {}}
+    for tf in TIMEFRAMES:
+        mn, mx, ct = parquet_stats(symbol, tf)
+        inv["timeframes"][tf] = {"count": ct, "min_ts": mn, "max_ts": mx}
+    out = asset_dir(symbol) / "inventory.json"
+    out.write_text(json.dumps(inv, indent=2) + "\n")
+    print(f"\nWROTE inventory: {out}")
+
+
 def main():
-    ap = argparse.ArgumentParser(description="Backfill core symbols to live.db")
+    ap = argparse.ArgumentParser(description="Backfill core symbols to Parquet or live.db")
     ap.add_argument("--symbol", help="Single symbol only (e.g. AAPL). Default: all core symbols")
     ap.add_argument("--skip", nargs="+", help="Symbols to skip (e.g. --skip AAPL SPY)")
+    ap.add_argument(
+        "--output",
+        choices=["parquet", "live"],
+        default="parquet",
+        help="Output: parquet (default) or live (legacy)",
+    )
     args = ap.parse_args()
+
+    use_parquet = args.output == "parquet"
+    out_desc = "Parquet" if use_parquet else "live.db"
 
     assets_to_backfill = core_assets()
     skip_set = {s.strip().upper() for s in (args.skip or [])}
@@ -394,11 +573,11 @@ def main():
         if not assets_to_backfill:
             print(f"Symbol {sym} not in core_assets(). Exiting.")
             return
-        print(f"Backfilling 1 symbol: {sym}")
+        print(f"Backfilling 1 symbol: {sym} -> {out_desc}")
     else:
         assets_to_backfill = [a for a in assets_to_backfill if a["symbol"] not in skip_set]
         symbols = [a["symbol"] for a in assets_to_backfill]
-        print(f"Backfilling {len(symbols)} core symbols: {symbols}")
+        print(f"Backfilling {len(symbols)} core symbols -> {out_desc}: {symbols}")
 
     for asset in assets_to_backfill:
         symbol = asset["symbol"]
@@ -412,28 +591,38 @@ def main():
             print(f"SKIP {symbol}: provider error {short}")
             continue
 
-        db = live_db_path(symbol)
-        print("\nDB:", db)
-        conn = connect(db)
-        ensure_schema(conn)
-
         try:
-            for tf in TIMEFRAMES:
-                ensure_cursor_row(conn, symbol, tf)
-                earliest = call_earliest(provider_symbol, tf)
-                if tf in INTRADAY_BACKWARD:
-                    backfill_backward(conn, symbol, provider_symbol, tf, earliest)
-                else:
-                    backfill_forward(conn, symbol, provider_symbol, tf, earliest)
-
-            write_inventory(symbol, conn)
-            conn.close()
+            if use_parquet:
+                print("\nOutput: Parquet", asset_dir(symbol) / "bars")
+                for tf in TIMEFRAMES:
+                    earliest = call_earliest(provider_symbol, tf)
+                    if tf in INTRADAY_BACKWARD:
+                        backfill_backward_parquet(symbol, provider_symbol, tf, earliest)
+                    else:
+                        backfill_forward_parquet(symbol, provider_symbol, tf, earliest)
+                write_inventory_parquet(symbol)
+                write_bar_manifest(symbol)
+            else:
+                db = live_db_path(symbol)
+                print("\nDB:", db)
+                conn = connect(db)
+                ensure_schema(conn)
+                for tf in TIMEFRAMES:
+                    ensure_cursor_row(conn, symbol, tf)
+                    earliest = call_earliest(provider_symbol, tf)
+                    if tf in INTRADAY_BACKWARD:
+                        backfill_backward(conn, symbol, provider_symbol, tf, earliest)
+                    else:
+                        backfill_forward(conn, symbol, provider_symbol, tf, earliest)
+                write_inventory(symbol, conn)
+                conn.close()
             print(f"\nDONE: {symbol} full backfill complete (or skipped where already complete).")
         except (RuntimeError, requests.RequestException) as e:
             msg = str(e)
             short = msg[:80] + "..." if len(msg) > 80 else msg
             print(f"SKIP {symbol}: provider error {short}")
-            conn.close()
+            if not use_parquet:
+                conn.close()
 
 
 if __name__ == "__main__":

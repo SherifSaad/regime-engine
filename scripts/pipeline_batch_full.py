@@ -2,15 +2,17 @@
 """
 Run full pipeline for many symbols from a batch file.
 
-Same flow as pipeline_asset_full.py (backfill → validate → freeze → compute),
+Same flow as pipeline_asset_full.py (backfill → migrate → validate → compute, Parquet-only),
 but reads symbols from a .txt file (one symbol per line) and runs the pipeline
 per symbol. Writes logs and summary to reports/batches/{batch_name}/.
 
 Usage:
   python scripts/pipeline_batch_full.py --batch-file batches/U001.txt
+  python scripts/pipeline_batch_full.py --mode daily   # uses earnings_symbols.txt
+  python scripts/pipeline_batch_full.py --mode daily --batch-file custom.txt
   python scripts/pipeline_batch_full.py --batch-file batches/U001.txt -t 1day
   python scripts/pipeline_batch_full.py --batch-file batches/U001.txt --skip-ingest
-  python scripts/pipeline_batch_full.py --batch-file batches/U001.txt --skip-if-done  # production: skip symbols already done
+  python scripts/pipeline_batch_full.py --batch-file batches/U001.txt --skip-if-done  # production
 """
 
 from __future__ import annotations
@@ -27,22 +29,17 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 def _symbol_already_done(symbol: str) -> bool:
     """
-    True if frozen + compute.db exist and verification passes.
-    Verification: frozen has bars, compute.db has escalation_history_v3 rows.
+    True if Parquet + compute.db exist and verification passes.
+    Verification: Parquet has bars (via BarsProvider), compute.db has escalation_history_v3 rows.
     """
-    asset_dir = PROJECT_ROOT / "data" / "assets" / symbol
-    frozen_cands = sorted(asset_dir.glob("frozen_*.db"))
-    if not frozen_cands:
-        return False
-    frozen = frozen_cands[-1]
-    compute_db = asset_dir / "compute.db"
+    from core.providers.bars_provider import BarsProvider
+
+    compute_db = PROJECT_ROOT / "data" / "assets" / symbol / "compute.db"
     if not compute_db.exists():
         return False
     try:
-        conn_f = sqlite3.connect(str(frozen))
-        bars = conn_f.execute("SELECT COUNT(*) FROM bars WHERE symbol=?", (symbol,)).fetchone()[0]
-        conn_f.close()
-        if bars < 100:
+        df = BarsProvider.get_bars(symbol, "1day").collect()
+        if len(df) < 100:
             return False
         conn_c = sqlite3.connect(str(compute_db))
         esc = conn_c.execute("SELECT COUNT(*) FROM escalation_history_v3 WHERE symbol=?", (symbol,)).fetchone()[0]
@@ -54,13 +51,19 @@ def _symbol_already_done(symbol: str) -> bool:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Batch pipeline: run pipeline_asset_full for each symbol in a batch file")
-    ap.add_argument("--batch-file", required=True, help="Path to batch file, e.g. batches/U001.txt")
+    ap.add_argument(
+        "--mode",
+        choices=["core", "daily"],
+        default="core",
+        help="core or daily. When daily, default batch file is earnings_symbols.txt",
+    )
+    ap.add_argument("--batch-file", help="Path to batch file. When --mode daily, default is earnings_symbols.txt")
     ap.add_argument("-t", "--timeframe", help="Pass through to pipeline_asset_full.py (e.g. 1day)")
     ap.add_argument("--skip-ingest", action="store_true", help="Pass through to pipeline_asset_full.py")
     ap.add_argument(
         "--skip-if-done",
         action="store_true",
-        help="Skip symbol if frozen + compute.db exist and verification passes (faster, production mode)",
+        help="Skip symbol if Parquet + compute.db exist and verification passes (faster, production mode)",
     )
     ap.add_argument(
         "--verbose",
@@ -69,11 +72,18 @@ def main() -> None:
     )
     args = ap.parse_args()
 
-    batch_path = Path(args.batch_file)
+    batch_file = args.batch_file
+    if not batch_file and args.mode == "daily":
+        batch_file = "earnings_symbols.txt"
+    if not batch_file:
+        print("ERROR: --batch-file required (or use --mode daily for earnings_symbols.txt)")
+        sys.exit(1)
+
+    batch_path = Path(batch_file)
     if not batch_path.exists():
-        batch_path = PROJECT_ROOT / args.batch_file
+        batch_path = PROJECT_ROOT / batch_file
     if not batch_path.exists():
-        print(f"ERROR: Batch file not found: {args.batch_file}")
+        print(f"ERROR: Batch file not found: {batch_file}")
         sys.exit(1)
 
     # Infer batch name from filename (e.g. U001 from batches/U001.txt)
@@ -97,19 +107,19 @@ def main() -> None:
     reports_dir.mkdir(parents=True, exist_ok=True)
 
     # Build pipeline command (args passed through)
-    cmd_base = ["python3", "scripts/pipeline_asset_full.py"]
+    cmd_base = ["python3", "scripts/pipeline_asset_full.py", "--mode", args.mode]
     tf_arg = ["-t", args.timeframe] if args.timeframe else []
     skip_arg = ["--skip-ingest"] if args.skip_ingest else []
 
     results = []
     n = len(symbols)
     for i, symbol in enumerate(symbols, 1):
-        # Skip-if-done: skip symbol when frozen + compute.db exist and verification passes
+        # Skip-if-done: skip symbol when Parquet + compute.db exist and verification passes
         if args.skip_if_done and _symbol_already_done(symbol):
             print(f"[{i}/{n}] {symbol}... skip (already done)", flush=True)
-            results.append({"symbol": symbol, "status": "OK", "reason": "already done (frozen + compute.db)"})
+            results.append({"symbol": symbol, "status": "OK", "reason": "already done (Parquet + compute.db)"})
             log_path = reports_dir / f"{symbol}.log"
-            log_path.write_text("Skipped: frozen + compute.db exist, verification passed\n", encoding="utf-8")
+            log_path.write_text("Skipped: Parquet + compute.db exist, verification passed\n", encoding="utf-8")
             continue
 
         print(f"[{i}/{n}] {symbol}...", flush=True)
@@ -146,11 +156,11 @@ def main() -> None:
                     reason = line.strip()
                     break
         else:
-            # Check if live.db was created (pipeline returned early without creating it)
-            live_db = PROJECT_ROOT / "data" / "assets" / symbol / "live.db"
-            if not args.skip_ingest and not live_db.exists():
+            # Check if bars were created (pipeline returned early without writing Parquet)
+            bars_dir = PROJECT_ROOT / "data" / "assets" / symbol / "bars"
+            if not args.skip_ingest and (not bars_dir.exists() or not any(bars_dir.iterdir())):
                 status = "SKIP"
-                reason = "ingest skipped (no live.db)"
+                reason = "ingest skipped (no bars)"
             else:
                 status = "OK"
                 reason = ""

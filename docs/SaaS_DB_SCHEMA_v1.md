@@ -1,5 +1,7 @@
 # Regime Engine SaaS – DB Schema v1 (Deterministic Core)
 
+**Purpose:** SaaS multi-tenant DB schema (tenancy, auth, billing, assets, engine runs). Use when building or extending the SaaS layer.
+
 ## 1) Tenancy
 ### tenants
 - id (uuid, pk)

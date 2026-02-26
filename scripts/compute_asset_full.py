@@ -2,7 +2,7 @@
 """
 Single compute step: escalation_history_v3 + state_history (market_state) + latest_state.
 
-Reads bars from Parquet (default) or frozen_*.db. Writes to compute.db.
+Reads bars from Parquet (default) or frozen_*.db (deprecated). Writes to compute.db.
 Full history, no caps. Hedge fund standards.
 
 Outputs (in compute.db):
@@ -16,7 +16,7 @@ Usage:
   python scripts/compute_asset_full.py --symbol QQQ
   python scripts/compute_asset_full.py --symbol QQQ -t 1day
   python scripts/compute_asset_full.py --symbol QQQ --input parquet   # default
-  python scripts/compute_asset_full.py --symbol QQQ --input frozen   # legacy
+  python scripts/compute_asset_full.py --symbol QQQ --input frozen   # deprecated (emit warning)
 """
 
 from __future__ import annotations
@@ -25,37 +25,43 @@ import argparse
 import datetime as _dt
 import json
 import sqlite3
+import time
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from core.manifest import write_compute_manifest
 from core.providers.bars_provider import BarsProvider
+from core.schema_versions import COMPUTE_DB_SCHEMA_VERSION
 from regime_engine.cli import compute_market_state_from_df
+from regime_engine.escalation_fast import compute_state_history_batch
 from regime_engine.escalation_buckets import compute_bucket_from_percentile
 from regime_engine.escalation_fast import compute_dsr_iix_ss_arrays_fast
-from regime_engine.escalation_v2 import compute_escalation_v2_series, rolling_percentile_transform
+from regime_engine.era_production import compute_esc_pctl_era_all
+from regime_engine.standard_v2_1 import TimeframePolicy
+from regime_engine.escalation_v2 import (
+    compute_escalation_v2_series,
+    compute_escalation_v2_pct_series,
+    expanding_percentile_transform,
+    rolling_percentile_transform,
+    get_escalation_metadata,
+)
 from regime_engine.features import compute_ema
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 TIMEFRAMES = ["15min", "1h", "4h", "1day", "1week"]
-PCTL_WINDOW = 504
 MIN_BARS = 400
 MIN_BARS_STATE = 200
 COMMIT_EVERY = 50
+STATE_BATCH_SIZE = 5000
+ESCALATION_BATCH_SIZE = 1000  # avoid "database is locked" on large inserts
 HORIZON_H = 20
 
 PCTL_WINDOWS = {
     "1day": {"p252": 252, "p504": 504, "p1260": 1260},
     "1week": {"p52": 52, "p104": 104, "p260": 260},
 }
-
-ERAS = [
-    ("pre2010", None, "2010-01-01"),
-    ("2010_2019", "2010-01-01", "2020-01-01"),
-    ("2020plus", "2020-01-01", None),
-]
-
 
 def asset_dir(symbol: str) -> Path:
     return PROJECT_ROOT / "data" / "assets" / symbol
@@ -122,15 +128,25 @@ def load_bars_from_parquet(symbol: str, tf: str) -> pd.DataFrame:
 def ensure_tables(conn: sqlite3.Connection) -> None:
     conn.execute(
         """
+        CREATE TABLE IF NOT EXISTS schema_version (
+            version TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        """
+    )
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS escalation_history_v3 (
             symbol TEXT NOT NULL,
             timeframe TEXT NOT NULL,
             asof TEXT NOT NULL,
             esc_raw REAL,
             esc_pctl REAL,
+            esc_pctl_expanding REAL,
             esc_pctl_252 REAL,
             esc_pctl_504 REAL,
             esc_pctl_1260 REAL,
+            esc_pctl_2520 REAL,
             esc_pctl_52 REAL,
             esc_pctl_104 REAL,
             esc_pctl_260 REAL,
@@ -145,9 +161,11 @@ def ensure_tables(conn: sqlite3.Connection) -> None:
     )
     existing_esc = {row[1] for row in conn.execute("PRAGMA table_info(escalation_history_v3);").fetchall()}
     for col, ctype in [
-        ("esc_pctl_252", "REAL"), ("esc_pctl_504", "REAL"), ("esc_pctl_1260", "REAL"),
+        ("esc_pctl_expanding", "REAL"),
+        ("esc_pctl_252", "REAL"), ("esc_pctl_504", "REAL"), ("esc_pctl_1260", "REAL"), ("esc_pctl_2520", "REAL"),
         ("esc_pctl_52", "REAL"), ("esc_pctl_104", "REAL"), ("esc_pctl_260", "REAL"),
-        ("esc_pctl_era", "REAL"), ("fwd_absret_h", "REAL"), ("event_flag", "INTEGER"),
+        ("esc_pctl_era", "REAL"), ("esc_pctl_era_confidence", "REAL"), ("esc_pctl_era_adj", "REAL"),
+        ("fwd_absret_h", "REAL"), ("event_flag", "INTEGER"),
         ("event_severity", "TEXT"),
     ]:
         if col not in existing_esc:
@@ -217,8 +235,18 @@ def run_escalation_tf(
         esc_raw = esc_raw[-len(df) :]
 
     esc_series = pd.Series(esc_raw, index=df.index)
-    print(f"  escalation: 2/5 percentiles...", flush=True)
-    pctl = rolling_percentile_transform(esc_series, window=PCTL_WINDOW)
+
+    tf_policy = TimeframePolicy(tf)
+    CONF_TARGET = tf_policy.bars_per_trading_year()
+    PCTL_MIN_BARS = tf_policy.percentile_min_bars()
+
+    print(f"  escalation: 2/5 percentiles (era=production, rolling 252/504/1260/2520)...", flush=True)
+    esc_pctl_expanding = compute_escalation_v2_pct_series(esc_series, min_bars=PCTL_MIN_BARS)
+
+    esc_pctl_era_adj, esc_pctl_era, esc_pctl_era_confidence = compute_esc_pctl_era_all(
+        esc_series, df, symbol, tf
+    )
+    pctl = esc_pctl_era_adj  # production signal (institutional)
 
     close = df["close"].astype(float).values
     n = len(close)
@@ -235,7 +263,7 @@ def run_escalation_tf(
         fwd_abs[i] = float(np.nanmax(np.abs(window)))
 
     fwd_series = pd.Series(fwd_abs, index=df.index)
-    fwd_pctl = rolling_percentile_transform(fwd_series, window=PCTL_WINDOW)
+    fwd_pctl = expanding_percentile_transform(fwd_series, min_bars=PCTL_MIN_BARS)  # PCTL_MIN_BARS from tf_policy
     event_flag = np.zeros(n, dtype=int)
     severity = np.array([None] * n, dtype=object)
     for i, p in enumerate(fwd_pctl.values):
@@ -250,38 +278,21 @@ def run_escalation_tf(
             event_flag[i] = 0
             severity[i] = "MILD" if p >= 0.90 else None
 
-    print(f"  escalation: 3/5 multi-horizon...", flush=True)
-    p252 = p504 = p1260 = None
+    print(f"  escalation: 3/5 rolling percentiles (252/504/1260/2520)...", flush=True)
+    p252 = rolling_percentile_transform(esc_series, window=252)
+    p504 = rolling_percentile_transform(esc_series, window=504)
+    p1260 = rolling_percentile_transform(esc_series, window=1260)
+    p2520 = rolling_percentile_transform(esc_series, window=2520)
     p52 = p104 = p260 = None
-    if tf in PCTL_WINDOWS:
-        w = PCTL_WINDOWS[tf]
-        if tf == "1day":
-            p252 = rolling_percentile_transform(esc_series, window=w["p252"])
-            p504 = rolling_percentile_transform(esc_series, window=w["p504"])
-            p1260 = rolling_percentile_transform(esc_series, window=w["p1260"])
-        elif tf == "1week":
-            p52 = rolling_percentile_transform(esc_series, window=w["p52"])
-            p104 = rolling_percentile_transform(esc_series, window=w["p104"])
-            p260 = rolling_percentile_transform(esc_series, window=w["p260"])
-
-    esc_pctl_era = pd.Series(np.full(len(df), np.nan, dtype=float), index=df.index)
-    for _, start_s, end_s in ERAS:
-        start = pd.to_datetime(start_s) if start_s else None
-        end = pd.to_datetime(end_s) if end_s else None
-        mask = pd.Series(True, index=df.index)
-        if start is not None:
-            mask &= (df.index >= start)
-        if end is not None:
-            mask &= (df.index < end)
-        if mask.sum() == 0:
-            continue
-        sub = esc_series.loc[mask]
-        esc_pctl_era.loc[mask] = rolling_percentile_transform(sub, window=PCTL_WINDOW).values
+    if tf == "1week":
+        p52 = rolling_percentile_transform(esc_series, window=52)
+        p104 = rolling_percentile_transform(esc_series, window=104)
+        p260 = rolling_percentile_transform(esc_series, window=260)
 
     buckets = []
     for x in pctl.values:
         if x is None or (isinstance(x, float) and np.isnan(x)):
-            buckets.append(None)
+            buckets.append("NA")
         else:
             buckets.append(compute_bucket_from_percentile(float(x))[0])
 
@@ -292,12 +303,16 @@ def run_escalation_tf(
             return None
         return float(x)
 
-    p252_vals = p252.values if p252 is not None else [None] * len(df)
-    p504_vals = p504.values if p504 is not None else [None] * len(df)
-    p1260_vals = p1260.values if p1260 is not None else [None] * len(df)
+    p252_vals = p252.values
+    p504_vals = p504.values
+    p1260_vals = p1260.values
+    p2520_vals = p2520.values
     p52_vals = p52.values if p52 is not None else [None] * len(df)
     p104_vals = p104.values if p104 is not None else [None] * len(df)
     p260_vals = p260.values if p260 is not None else [None] * len(df)
+    esc_pctl_exp_vals = esc_pctl_expanding.values
+    esc_pctl_era_conf_vals = esc_pctl_era_confidence.values
+    esc_pctl_era_adj_vals = esc_pctl_era_adj.values
 
     print(f"  escalation: 4/5 building rows...", flush=True)
     rows = []
@@ -307,9 +322,12 @@ def run_escalation_tf(
         rows.append((
             symbol, tf, asof,
             fval(ev), fval(pc),
-            fval(p252_vals[i]), fval(p504_vals[i]), fval(p1260_vals[i]),
+            fval(esc_pctl_exp_vals[i]),
+            fval(p252_vals[i]), fval(p504_vals[i]), fval(p1260_vals[i]), fval(p2520_vals[i]),
             fval(p52_vals[i]), fval(p104_vals[i]), fval(p260_vals[i]),
             fval(esc_pctl_era.values[i]),
+            fval(esc_pctl_era_conf_vals[i]),
+            fval(esc_pctl_era_adj_vals[i]),
             None if bk is None else str(bk),
             fval(fwd_abs[i]),
             None if not np.isfinite(fwd_abs[i]) else int(event_flag[i]),
@@ -317,20 +335,22 @@ def run_escalation_tf(
         ))
 
     print(f"  escalation: 5/5 writing {len(rows)} rows...", flush=True)
-    conn_write.executemany(
-        """
+    stmt = """
         INSERT OR REPLACE INTO escalation_history_v3(
           symbol,timeframe,asof,
           esc_raw,esc_pctl,
-          esc_pctl_252,esc_pctl_504,esc_pctl_1260,
+          esc_pctl_expanding,
+          esc_pctl_252,esc_pctl_504,esc_pctl_1260,esc_pctl_2520,
           esc_pctl_52,esc_pctl_104,esc_pctl_260,
-          esc_pctl_era,esc_bucket,
+          esc_pctl_era,esc_pctl_era_confidence,esc_pctl_era_adj,esc_bucket,
           fwd_absret_h,event_flag,event_severity
         )
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
-        """,
-        rows,
-    )
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);
+    """
+    for i in range(0, len(rows), ESCALATION_BATCH_SIZE):
+        batch = rows[i : i + ESCALATION_BATCH_SIZE]
+        conn_write.executemany(stmt, batch)
+        conn_write.commit()
     return len(rows)
 
 
@@ -340,7 +360,7 @@ def run_state_tf(
     symbol: str,
     tf: str,
 ) -> tuple[int, int]:
-    """Backfill state_history for one TF. Returns (wrote, skipped)."""
+    """Backfill state_history for one TF. Returns (wrote, skipped). Batch insert, one transaction."""
     if len(df) < MIN_BARS_STATE:
         return 0, 0
 
@@ -350,33 +370,43 @@ def run_state_tf(
     ).fetchall()
     asofs_done = {r[0] for r in rows_done}
 
-    idx = df.index
+    # Preload esc_pctl (esc_pctl_era_adj) from escalation_history_v3 for bucket override
+    esc_rows = conn_write.execute(
+        "SELECT asof, esc_pctl FROM escalation_history_v3 WHERE symbol=? AND timeframe=?",
+        (symbol, tf),
+    ).fetchall()
+    asof_to_esc_pctl = {r[0]: r[1] for r in esc_rows}
+
     ts_strs = df["ts_str"].values
-    wrote, skipped = 0, 0
-    warn_count = 0  # batch same warnings
-    for i in range(len(df)):
-        asof = ts_strs[i]
+    asof_set = set(ts_strs)
+    asof_to_esc_pctl_full = {a: asof_to_esc_pctl.get(a) for a in asof_set}
+
+    t0 = time.perf_counter()
+    batch_results = compute_state_history_batch(
+        df, symbol, asof_to_esc_pctl_full,
+    )
+    t_compute = time.perf_counter() - t0
+
+    rows_to_insert: list[tuple[str, str, str, str]] = []
+    for asof, state in batch_results:
         if asof in asofs_done:
-            skipped += 1
-            continue
-        sub = df.iloc[: i + 1].copy()
-        try:
-            state = compute_market_state_from_df(
-                sub, symbol, diagnostics=False, include_escalation_v2=True
-            )
-        except Exception as e:
-            warn_count += 1
-            if warn_count <= 3:  # only print first few
-                print(f"  [WARN] bar {i} asof={asof}: {e}", flush=True)
-            elif warn_count == 4:
-                print(f"  [WARN] (further 'not enough history' warnings suppressed)", flush=True)
             continue
         state["timeframe"] = tf
         state_json = json.dumps(state, separators=(",", ":"), ensure_ascii=False)
-        conn_write.execute(
-            "INSERT OR IGNORE INTO state_history(symbol,timeframe,asof,state_json) VALUES(?,?,?,?)",
-            (symbol, tf, asof, state_json),
-        )
+        rows_to_insert.append((symbol, tf, asof, state_json))
+
+    wrote = len(rows_to_insert)
+    skipped = sum(1 for s in ts_strs if s in asofs_done)
+
+    t1 = time.perf_counter()
+    if rows_to_insert:
+        for chunk_start in range(0, wrote, STATE_BATCH_SIZE):
+            chunk = rows_to_insert[chunk_start : chunk_start + STATE_BATCH_SIZE]
+            conn_write.executemany(
+                "INSERT OR IGNORE INTO state_history(symbol,timeframe,asof,state_json) VALUES(?,?,?,?)",
+                chunk,
+            )
+        last = rows_to_insert[-1]
         conn_write.execute(
             """
             INSERT INTO latest_state(symbol,timeframe,asof,state_json,updated_at,updated_utc)
@@ -387,14 +417,12 @@ def run_state_tf(
                 updated_at=excluded.updated_at,
                 updated_utc=excluded.updated_utc
             """,
-            (symbol, tf, asof, state_json, now_utc_iso(), now_utc_iso()),
+            (last[0], last[1], last[2], last[3], now_utc_iso(), now_utc_iso()),
         )
-        wrote += 1
-        if wrote % COMMIT_EVERY == 0:
-            conn_write.commit()
-        pct = 100 * (i + 1) // len(df) if len(df) else 0
-        if (i + 1) % 50 == 0 or i == 0 or i == len(df) - 1:
-            print(f"  state progress: {pct}% bar {i+1}/{len(df)} wrote={wrote} skipped={skipped}", flush=True)
+        conn_write.commit()
+    t_write = time.perf_counter() - t1
+
+    print(f"  state_history: wrote={wrote} skipped={skipped} | compute={t_compute:.1f}s write={t_write:.1f}s", flush=True)
     return wrote, skipped
 
 
@@ -455,7 +483,7 @@ def main() -> None:
         "--input",
         choices=["parquet", "frozen"],
         default="parquet",
-        help="Bar source: parquet (default) or frozen DB",
+        help="Bar source: parquet (default). frozen is deprecated.",
     )
     args = ap.parse_args()
     symbol = args.symbol.strip().upper()
@@ -468,11 +496,19 @@ def main() -> None:
     if use_parquet:
         print(f"[compute_asset_full] symbol={symbol} input=parquet (full history)")
     else:
+        import warnings
+
+        warnings.warn(
+            "--input frozen is deprecated. Use Parquet (default). Pipeline will remove freeze step.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        print("[compute_asset_full] WARNING: --input frozen is deprecated. Use Parquet (default).")
         frozen = latest_frozen_db_path(symbol)
         if frozen is None or not frozen.exists():
             raise SystemExit(
                 f"No frozen DB found for {symbol}. "
-                "Run: ingest → validate → freeze (bars only) before compute."
+                f"Use Parquet: run migrate_live_to_parquet.py --symbol {symbol} first."
             )
         conn_read = sqlite3.connect(str(frozen), timeout=60)
         print(f"[compute_asset_full] symbol={symbol} input=frozen read={frozen}")
@@ -481,14 +517,26 @@ def main() -> None:
     compute_db.parent.mkdir(parents=True, exist_ok=True)
 
     conn_write = sqlite3.connect(str(compute_db), timeout=60)
-    conn_write.execute("PRAGMA journal_mode=WAL;")
+    try:
+        conn_write.execute("PRAGMA journal_mode=WAL;")
+    except sqlite3.OperationalError:
+        pass  # Fallback to default (DELETE); some filesystems don't support WAL
     conn_write.execute("PRAGMA synchronous=NORMAL;")
     ensure_tables(conn_write)
+
+    # Write schema version on create/update
+    conn_write.execute("DELETE FROM schema_version")
+    conn_write.execute(
+        "INSERT INTO schema_version(version, updated_at) VALUES(?, ?)",
+        (COMPUTE_DB_SCHEMA_VERSION, now_utc_iso()),
+    )
+    conn_write.commit()
 
     print(f"  write={compute_db}")
     total_esc = 0
     total_state_wrote = 0
     total_state_skipped = 0
+    bar_count_used = 0
 
     for tf in tfs:
         print(f"\n--- {tf} ---", flush=True)
@@ -500,19 +548,26 @@ def main() -> None:
         if df.empty:
             print(f"  no bars for {tf}, skipping")
             continue
+        bar_count_used += len(df)
         print(f"  bars: {len(df)}", flush=True)
         print(f"  escalation: computing...", flush=True)
         n_esc = run_escalation_tf(df, conn_write, symbol, tf)
         total_esc += n_esc
         print(f"  escalation: {n_esc} rows", flush=True)
-        print(f"  state: computing (per-bar, may take a while)...", flush=True)
+        print(f"  state: computing (per-bar)...", flush=True)
         w, s = run_state_tf(df, conn_write, symbol, tf)
         total_state_wrote += w
         total_state_skipped += s
-        print(f"  state_history: wrote={w} skipped={s}")
 
     update_latest_state_hazard(conn_write, symbol)
     conn_write.commit()
+
+    write_compute_manifest(
+        symbol,
+        bar_count_used=bar_count_used,
+        compute_db_path=compute_db,
+    )
+
     if conn_read is not None:
         conn_read.close()
     conn_write.close()

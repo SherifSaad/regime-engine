@@ -50,6 +50,7 @@ DAILY_TIMEFRAMES = ["1day", "1week"]
 OVERLAP_BARS = 5
 RATE_LIMIT_SLEEP = 65
 COMPUTE_SCRIPT = Path(__file__).resolve().parent / "compute_asset_full.py"
+VALIDATE_SCRIPT = Path(__file__).resolve().parent / "validate_asset_bars.py"
 
 # ----------------------------
 # Helpers
@@ -161,6 +162,18 @@ def fetch_daily_bars(symbol: str, provider_symbol: str) -> Tuple[int, Optional[s
     return total, None
 
 
+def run_validate(symbol: str) -> bool:
+    """Run validate_asset_bars. Returns True if pass, False if fail."""
+    result = subprocess.run(
+        [sys.executable, str(VALIDATE_SCRIPT), "--symbol", symbol, "--input", "parquet"],
+        cwd=str(Path(__file__).resolve().parent.parent),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    return result.returncode == 0
+
+
 def run_canonical_compute(symbol: str) -> bool:
     """Run canonical compute (compute_asset_full, Parquet input, full history) → compute.db."""
     t0 = time.time()
@@ -196,6 +209,21 @@ def run_canonical_compute(symbol: str) -> bool:
 # ----------------------------
 
 def main():
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Daily scheduler – fetch bars, canonical compute")
+    ap.add_argument(
+        "--validate",
+        action="store_true",
+        help="Run validate before compute (default: skip for speed)",
+    )
+    ap.add_argument(
+        "--force-recompute",
+        action="store_true",
+        help="Run compute even when no new bars (e.g. after regime logic or threshold changes)",
+    )
+    args = ap.parse_args()
+
     # Start universe.json watcher in background (for long-running or repeated runs)
     watcher_thread = Thread(target=start_universe_watcher, daemon=True)
     watcher_thread.start()
@@ -217,7 +245,14 @@ def main():
                 print(f"  Error updating {symbol}: {err}")
             else:
                 print(f"  Success: updated {symbol} (inserted={inserted})")
-                run_canonical_compute(symbol)
+                # Run compute when new bars inserted, or when --force-recompute (e.g. code/params change)
+                if inserted > 0 or args.force_recompute:
+                    if args.validate and not run_validate(symbol):
+                        print(f"  Skipping compute for {symbol} (validation failed)")
+                    else:
+                        run_canonical_compute(symbol)
+                else:
+                    print(f"  Skipping compute for {symbol} (no new bars; use --force-recompute to override)")
         except Exception as e:
             print(f"  Error updating {symbol}: {e}")
 

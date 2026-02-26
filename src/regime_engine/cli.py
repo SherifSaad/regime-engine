@@ -24,9 +24,13 @@ def _trend_to_float(trend: str | float, rising: str, falling: str) -> float:
         return -0.5
     return 0.0
 from regime_engine.escalation_buckets import compute_bucket_from_percentile
-from regime_engine.escalation_v2 import rolling_percentile_transform
-from regime_engine.escalation_v2 import compute_escalation_v2
-from regime_engine.escalation_v2 import compute_escalation_v2_series
+from regime_engine.escalation_v2 import (
+    compute_escalation_v2,
+    compute_escalation_v2_series,
+    compute_escalation_v2_pct_series,
+    expanding_percentile_transform,
+    get_escalation_metadata,
+)
 from regime_engine.escalation_fast import compute_dsr_iix_ss_arrays_fast
 from regime_engine.features import (
     compute_ema,
@@ -49,7 +53,9 @@ from regime_engine.metrics import (
 
 
 def compute_market_state_from_df(
-    df, symbol: str, *, diagnostics: bool = False, include_escalation_v2: bool = False
+    df, symbol: str, *, diagnostics: bool = False, include_escalation_v2: bool = False,
+    esc_pctl_override: float | None = None,
+    tf: str | None = None,
 ):
     """
     Pure engine function.
@@ -230,27 +236,39 @@ def compute_market_state_from_df(
         )
         output["escalation_v2"] = float(escalation_v2)
 
-        # Build escalation_v2 series via vectorized compute_escalation_v2_series
+        # Build escalation_v2 series: percentile-based components, equal-weight aggregate
         esc_full = compute_escalation_v2_series(
             dsr_arr, iix_arr, ss_arr, close_arr, ema_arr
         )
-        # First valid escalation at bar 31 (w_max-1 = 11 in 0-based close_arr)
-        w_max = max(10, 5, 10, 5) + 2  # 12
+        w_max = 12
         n_esc = max(0, len(df) - 31)
         esc_vals = list(esc_full[w_max - 1 : w_max - 1 + n_esc]) if n_esc > 0 else []
         esc_v2_series = pd.Series(
             [float("nan")] * min(31, len(df)) + esc_vals,
             index=df.index,
         )
-        esc_v2_pct_series = rolling_percentile_transform(esc_v2_series, window=504)
+        esc_v2_pct_series = compute_escalation_v2_pct_series(esc_v2_series, min_bars=252)
         escalation_v2_pct_today = esc_v2_pct_series.iloc[-1] if len(esc_v2_pct_series) else float("nan")
 
-        escalation_bucket, escalation_action, escalation_thresholds = compute_bucket_from_percentile(
-            escalation_v2_pct_today
-        )
+        # Production: esc_pctl_era_adj when tf provided; else esc_pctl_override; else expanding
+        pctl_for_bucket = esc_pctl_override
+        if pctl_for_bucket is None and tf:
+            from regime_engine.era_production import compute_esc_pctl_era_adj
+            esc_pctl_era_adj_series = compute_esc_pctl_era_adj(esc_v2_series, df, symbol, tf)
+            pctl_for_bucket = esc_pctl_era_adj_series.iloc[-1] if len(esc_pctl_era_adj_series) else None
+            output["esc_pctl_era_adj"] = float(pctl_for_bucket) if pctl_for_bucket is not None and not np.isnan(pctl_for_bucket) else None
+        if pctl_for_bucket is None:
+            pctl_for_bucket = escalation_v2_pct_today
+        if pctl_for_bucket is not None and (isinstance(pctl_for_bucket, float) and not np.isnan(pctl_for_bucket)):
+            escalation_bucket, escalation_action, escalation_thresholds = compute_bucket_from_percentile(
+                float(pctl_for_bucket)
+            )
+        else:
+            escalation_bucket, escalation_action, escalation_thresholds = "NA", "NORMAL_SIZE", {}
         output["escalation_bucket"] = escalation_bucket
         output["escalation_action"] = escalation_action
         output["escalation_bucket_thresholds"] = escalation_thresholds
+        output["escalation_metadata"] = get_escalation_metadata()
         output["escalation_v2_parts"] = {
             "C1_DSR_level": float(esc_parts["C1_DSR_level"]),
             "C2_DSR_delta": float(esc_parts["C2_DSR_delta"]),

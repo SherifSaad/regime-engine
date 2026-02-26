@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from regime_engine.escalation_buckets import compute_bucket_from_percentile
-from regime_engine.escalation_v2 import rolling_percentile_transform
+from regime_engine.escalation_v2 import expanding_percentile_transform
 from regime_engine.features import realized_vol_annualized, rolling_percentile_rank
 from regime_engine.hysteresis import hysteresis_high_state, bucket_from_high_state
 
@@ -288,9 +288,9 @@ def _build_base_from_engine(engine_df: pd.DataFrame, trading_days: int = 252) ->
     valid = engine_df["escalation_v2"].notna()
     sub = engine_df.loc[valid].copy()
 
-    esc_v2_pct = rolling_percentile_transform(
+    esc_v2_pct = expanding_percentile_transform(
         pd.Series(sub["escalation_v2"].values, index=sub.index),
-        window=504,
+        min_bars=252,
     )
     sub["escalation_v2_pct"] = esc_v2_pct
 

@@ -85,8 +85,8 @@ def main():
     if states.empty:
         raise RuntimeError(
             "No rows found in state_history for SPY 1day. "
-            "Run pipeline: ingest → validate → freeze → compute. "
-            "Or: python scripts/compute_asset_full.py --symbol SPY -t 1day (requires frozen bars)"
+            "Run pipeline: backfill → migrate → validate → compute (Parquet). "
+            "Or: python scripts/compute_asset_full.py --symbol SPY -t 1day (requires Parquet bars)"
         )
 
     results = []

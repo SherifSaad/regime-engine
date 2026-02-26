@@ -59,6 +59,7 @@ OVERLAP_BARS = 5
 SLEEP_SEC = 900  # 15 min – align with 15min bar cadence, avoid wasted API calls
 RATE_LIMIT_SLEEP = 65
 COMPUTE_SCRIPT = Path(__file__).resolve().parent / "compute_asset_full.py"
+VALIDATE_SCRIPT = Path(__file__).resolve().parent / "validate_asset_bars.py"
 
 # ----------------------------
 # Helpers
@@ -173,6 +174,18 @@ def fetch_incremental_symbol(symbol: str, vendor_symbol: str) -> Tuple[int, int]
 
     return total, polled
 
+def run_validate(symbol: str) -> bool:
+    """Run validate_asset_bars. Returns True if pass, False if fail."""
+    result = subprocess.run(
+        [sys.executable, str(VALIDATE_SCRIPT), "--symbol", symbol, "--input", "parquet"],
+        cwd=str(Path(__file__).resolve().parent.parent),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    return result.returncode == 0
+
+
 def run_canonical_compute(symbol: str) -> bool:
     """Run canonical compute (compute_asset_full, Parquet input, full history) → compute.db."""
     t0 = time.time()
@@ -207,6 +220,21 @@ def run_canonical_compute(symbol: str) -> bool:
 # ----------------------------
 
 def main():
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Core scheduler – poll every 15 min, canonical compute")
+    ap.add_argument(
+        "--validate",
+        action="store_true",
+        help="Run validate before compute (default: skip for speed)",
+    )
+    ap.add_argument(
+        "--force-recompute-on-start",
+        action="store_true",
+        help="Run compute for all symbols once at startup (e.g. after regime logic or threshold changes)",
+    )
+    args = ap.parse_args()
+
     # Start universe.json watcher in background
     watcher_thread = Thread(target=start_universe_watcher, daemon=True)
     watcher_thread.start()
@@ -217,6 +245,15 @@ def main():
     print(f"Processing {len(core_symbols)} symbols: {core_symbols}")
     print("TFs:", ", ".join(TIMEFRAMES))
     print("Scheduler starting...\n")
+
+    if args.force_recompute_on_start:
+        print("[PIPELINE] --force-recompute-on-start: running compute for all symbols...")
+        for sym in core_symbols:
+            if args.validate and not run_validate(sym):
+                print(f"  Skipping {sym} (validation failed)")
+            else:
+                run_canonical_compute(sym)
+        print("[PIPELINE] Force recompute complete.\n")
 
     while True:
         try:
@@ -251,9 +288,13 @@ def main():
                 if inserted > 0:
                     changed_symbols.append(sym)
 
+            # Run compute only for symbols with new bars (Standard 6: compute only when changed)
             for sym in changed_symbols:
                 print(f"\n[PIPELINE] {sym} new bars detected -> canonical compute...")
-                run_canonical_compute(sym)
+                if args.validate and not run_validate(sym):
+                    print(f"  Skipping compute for {sym} (validation failed)")
+                else:
+                    run_canonical_compute(sym)
 
             if not changed_symbols:
                 if total_polled == 0:

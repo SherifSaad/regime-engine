@@ -1,5 +1,7 @@
 # Phase 1 Summary – Regime Intelligence Refactor
 
+**Purpose:** Phase 1 folder structure, key files, and import verification. Archive reference.
+
 **Status:** Complete  
 **Date:** 2026-02-24
 

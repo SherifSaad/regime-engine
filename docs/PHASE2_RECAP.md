@@ -1,5 +1,7 @@
 # PHASE 2 RECAP – Product Vision & Technical Alignment (Feb 24 2026)
 
+**Purpose:** Product vision (Core vs Earnings intelligence) and technical alignment. Archive reference.
+
 ## Final Business / Product Requirement (confirmed by user)
 We have **two distinct user-facing intelligence offerings** in the same app:
 

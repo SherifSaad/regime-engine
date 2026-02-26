@@ -1,7 +1,19 @@
 import os
 import glob
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional, Tuple
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def compute_db_path(symbol: str) -> Optional[Path]:
+    """
+    Path to compute.db for symbol (scheduler output).
+    Returns None if file does not exist.
+    """
+    p = PROJECT_ROOT / "data" / "assets" / _norm_symbol(symbol) / "compute.db"
+    return p if p.exists() else None
 
 
 @dataclass(frozen=True)

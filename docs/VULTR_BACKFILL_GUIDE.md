@@ -1,6 +1,8 @@
 # Run SPY Escalation Backfill on Vultr (Beginner Guide)
 
-This guide walks you through running the slow escalation backfill on your Vultr server. You'll copy your project + data to the server, run the script, then copy the results back.
+**Purpose:** Ops guide to run the escalation backfill on a Vultr server. Copy project + data → run backfill → copy results back.
+
+This guide walks you through running the slow escalation backfill on your Vultr server.
 
 ---
 

@@ -4,12 +4,15 @@ import polars as pl
 from typing import Optional
 import logging
 
+from core.schema_versions import PARQUET_BARS_SCHEMA_VERSION
 from core.timeframes import normalize_timeframe
 
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]  # core/providers/ → root
 ASSETS_ROOT = PROJECT_ROOT / "data" / "assets"
+
+# Parquet bars schema (v1): ts, open, high, low, close, volume. See docs/SCHEMA_VERSIONS.md
 
 
 def get_bars_path(symbol: str, timeframe: str) -> Path:
@@ -58,6 +61,7 @@ class BarsProvider:
 
         # Scan all partitioned Parquet files recursively
         lf = pl.scan_parquet(path / "**/*.parquet")
+        # Future: optional schema validation on read (check schema_version in metadata)
 
         # Apply upto_ts filter if provided
         if upto_ts:
@@ -109,11 +113,12 @@ class BarsProvider:
         # Add partition column
         df = df.with_columns(pl.col("ts").dt.date().alias("date"))
 
-        # Write partitioned
+        # Write partitioned (schema_version in metadata for reproducibility)
         df.write_parquet(
             path,
             partition_by="date",
             compression="zstd",
+            metadata={"schema_version": PARQUET_BARS_SCHEMA_VERSION},
         )
 
         logger.info(f"Wrote {len(df)} bars to {path}")

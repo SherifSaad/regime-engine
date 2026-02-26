@@ -1,5 +1,7 @@
 # Phase 7 Final – Backend Verification Test
 
+**Purpose:** Verification test results for config reload, scheduler, and Parquet flow. Archive reference.
+
 **Date:** 2026-02-24  
 **Status:** PASSED
 

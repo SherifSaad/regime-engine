@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 
-from core.data_loader import find_asset_bundle
+from core.data_loader import compute_db_path, find_asset_bundle
 
 
 # -----------------------------
@@ -233,14 +234,100 @@ def _normalize_history(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _get_snapshot_from_compute_db(symbol: str, timeframe: str) -> Optional[EngineSnapshot]:
+    """
+    Load state/history from compute.db (scheduler output). Returns None if no data.
+    """
+    db_path = compute_db_path(symbol)
+    if not db_path:
+        return None
+
+    try:
+        conn = sqlite3.connect(str(db_path))
+        # latest_state: state_json is the full regime state (same format as bundle)
+        row = conn.execute(
+            "SELECT asof, state_json FROM latest_state WHERE symbol=? AND timeframe=?",
+            (symbol.upper().strip(), timeframe),
+        ).fetchone()
+        conn.close()
+
+        if not row or not row[1]:
+            return None
+
+        asof_val, state_json_str = row[0], row[1]
+        state = json.loads(state_json_str) if isinstance(state_json_str, str) else state_json_str
+        if not isinstance(state, dict):
+            return None
+
+        # Build history from state_history
+        conn = sqlite3.connect(str(db_path))
+        rows = conn.execute(
+            "SELECT asof, state_json FROM state_history WHERE symbol=? AND timeframe=? ORDER BY asof ASC",
+            (symbol.upper().strip(), timeframe),
+        ).fetchall()
+        conn.close()
+
+        hist_rows = []
+        for asof, sj in rows:
+            try:
+                st = json.loads(sj) if isinstance(sj, str) else sj
+                esc = st.get("escalation_v2")
+                if esc is None:
+                    esc = st.get("escalation")
+                hist_rows.append({"date": asof, "escalation_v2": float(esc) if esc is not None else float("nan")})
+            except Exception:
+                pass
+        hist = pd.DataFrame(hist_rows) if hist_rows else pd.DataFrame(columns=["date", "escalation_v2"])
+        hist = _normalize_history(hist)
+
+        cls = state.get("classification") if isinstance(state.get("classification"), dict) else {}
+        regime_label = _as_str(_pick_first(cls, ["regime_label"], default="TRANSITION"))
+        confidence = _as_float(_pick_first(cls, ["confidence"], default=float("nan")), default=float("nan"))
+        tags = cls.get("strategy_tags", [])
+        conviction = "Unknown Conviction"
+        if isinstance(tags, list):
+            conv = next((t for t in tags if str(t).endswith("_CONVICTION")), None)
+            if conv:
+                conviction = _title_case_enum(str(conv))
+        escalation_v2 = _as_float(_pick_first(state, ["escalation_v2"], default=float("nan")), default=float("nan"))
+        risk_posture = _as_str(_pick_first(cls, ["risk_posture"], default=""))
+        if not risk_posture:
+            risk_posture = _derive_risk_posture(regime_label, escalation_v2 if pd.notna(escalation_v2) else 0.0)
+        metrics_11 = _extract_metrics_11(state)
+        explanation_lines = _extract_explanation_lines(state)
+        if conviction.endswith("_CONVICTION") or conviction.isupper():
+            conviction = _title_case_enum(conviction)
+
+        return EngineSnapshot(
+            symbol=str(symbol).upper().strip(),
+            timeframe=str(timeframe),
+            asof=asof_val or "unknown",
+            regime_label=regime_label,
+            confidence=float(confidence) if pd.notna(confidence) else float("nan"),
+            conviction=conviction,
+            escalation_v2=float(escalation_v2) if pd.notna(escalation_v2) else float("nan"),
+            risk_posture=risk_posture,
+            latest_state_raw=state,
+            history=hist,
+            metrics_11=metrics_11,
+            explanation_lines=explanation_lines,
+        )
+    except Exception:
+        return None
+
+
 # -----------------------------
 # Public API (UI calls only these)
 # -----------------------------
 def get_snapshot(symbol: str, timeframe: str = "1day", *, root: str = "validation_outputs") -> EngineSnapshot:
     """
-    Returns the latest state + full history for symbol by reading the audit bundle.
-    Later, we will swap internals to live compute (Twelve Data) with same return type.
+    Returns the latest state + full history for symbol.
+    Prefers compute.db (scheduler output); falls back to validation_outputs (legacy audit bundle).
     """
+    snap = _get_snapshot_from_compute_db(symbol, timeframe)
+    if snap is not None:
+        return snap
+
     bundle = find_asset_bundle(symbol, root=root)
     payload = _safe_read_json(bundle.latest_state_json)
     state = _unwrap_latest_state(payload)

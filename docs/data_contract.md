@@ -1,5 +1,7 @@
 # Regime Engine Data Contract
 
+**Purpose:** Bar format, required/optional fields, and normalization rules. Use when ingesting or validating bar data.
+
 ## Required fields
 The engine consumes a time-ordered series of bars.
 

@@ -378,7 +378,7 @@ with colB:
     st.button("Run Release Build (this asset)", width="stretch", disabled=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# Resolve selected asset state via engine gateway (UI never touches validation_outputs directly)
+# Resolve selected asset state via engine gateway (compute.db preferred, validation_outputs fallback)
 snap = get_snapshot(symbol, timeframe=timeframe, root="validation_outputs")
 hist = snap.history
 
@@ -447,6 +447,6 @@ with right2:
         unsafe_allow_html=True,
     )
     st.subheader("Controls")
-    st.caption("Data via core/engine gateway.")
+    st.caption("Data via engine (compute.db → validation_outputs).")
     st.button("Download audit bundle (this asset)", width="stretch", disabled=True)
     st.markdown("</div>", unsafe_allow_html=True)

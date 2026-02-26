@@ -1,5 +1,7 @@
 # Regime Intelligence Monorepo
 
+**Purpose:** Root of the regime-engine monorepo. Apps (web, internal), services (API), shared packages.
+
 ## Apps
 - apps/web: Next.js (public + authenticated UI)
 - apps/internal: Streamlit (internal ops/validation)

@@ -1,5 +1,7 @@
 # Timeframe Convention
 
+**Purpose:** Canonical timeframe names and aliases. Use when normalizing API input or storing bars.
+
 ## Canonical timeframes
 
 All bar folders and API calls use these names:

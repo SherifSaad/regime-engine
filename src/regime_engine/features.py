@@ -17,7 +17,7 @@ def compute_realized_vol(returns: pd.Series, period: int = 20) -> pd.Series:
     return returns.rolling(period).std() * np.sqrt(252)
 
 
-def compute_atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
+def compute_atr(df: pd.DataFrame, period: int = 20) -> pd.Series:
     high = df["high"]
     low = df["low"]
     close = df["close"]

@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from regime_engine.escalation_buckets import compute_bucket_from_percentile
-from regime_engine.escalation_v2 import rolling_percentile_transform
+from regime_engine.escalation_v2 import expanding_percentile_transform
 from regime_engine.hysteresis import hysteresis_high_state, bucket_from_high_state
 
 # Import from validate_regimes (same data loading)
@@ -35,14 +35,14 @@ def main() -> int:
     valid = df["escalation_v2"].notna()
     sub = df.loc[valid].copy()
 
-    # Percentile transform (distribution-aware)
-    esc_v2_pct = rolling_percentile_transform(
+    # Percentile transform (expanding, min 252 bars)
+    esc_v2_pct = expanding_percentile_transform(
         pd.Series(sub["escalation_v2"].values, index=sub.index),
-        window=504,  # 2 years trading days
+        min_bars=252,
     )
     sub["escalation_v2_pct"] = esc_v2_pct
 
-    # Drop rows where percentile is NaN (first 504 of sub)
+    # Drop rows where percentile is NaN (first 252 of sub)
     valid_pct = sub["escalation_v2_pct"].notna()
     sub = sub.loc[valid_pct].copy()
 
