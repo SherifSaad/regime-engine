@@ -37,7 +37,8 @@
 |-----|---------|
 | [UI_PERCENTILE_REFERENCE_DISTRIBUTIONS.md](UI_PERCENTILE_REFERENCE_DISTRIBUTIONS.md) | **Required** UI labels for percentile types |
 | [REPRODUCIBILITY.md](REPRODUCIBILITY.md) | Deterministic compute, manifests |
-| [VULTR_BACKFILL_GUIDE.md](VULTR_BACKFILL_GUIDE.md) | Ops: backfill on Vultr |
+| [VULTR_RUN_PLAN.md](VULTR_RUN_PLAN.md) | **Vultr:** Track progress, resume, transfer for 1600 symbols |
+| [VULTR_BACKFILL_GUIDE.md](VULTR_BACKFILL_GUIDE.md) | Ops: backfill on Vultr (legacy) |
 | [SaaS_DB_SCHEMA_v1.md](SaaS_DB_SCHEMA_v1.md) | SaaS DB schema (if used) |
 
 ---

@@ -311,20 +311,6 @@
       "update_frequency": "15min"
     },
     {
-      "symbol": "HGUSD",
-      "provider_symbol": "HG/USD",
-      "name": "HGUSD",
-      "asset_class": "Commodities",
-      "exchange": "",
-      "currency": "USD",
-      "active": true,
-      "scheduler_enabled": true,
-      "tags": [
-        "core"
-      ],
-      "update_frequency": "15min"
-    },
-    {
       "symbol": "HYG",
       "provider_symbol": "HYG",
       "name": "HYG",
@@ -549,48 +535,6 @@
       "update_frequency": "15min"
     },
     {
-      "symbol": "US02Y",
-      "provider_symbol": "US02Y",
-      "name": "US02Y",
-      "asset_class": "Fixed Income",
-      "exchange": "",
-      "currency": "USD",
-      "active": true,
-      "scheduler_enabled": true,
-      "tags": [
-        "core"
-      ],
-      "update_frequency": "15min"
-    },
-    {
-      "symbol": "US10Y",
-      "provider_symbol": "US10Y",
-      "name": "US10Y",
-      "asset_class": "Fixed Income",
-      "exchange": "",
-      "currency": "USD",
-      "active": true,
-      "scheduler_enabled": true,
-      "tags": [
-        "core"
-      ],
-      "update_frequency": "15min"
-    },
-    {
-      "symbol": "US30Y",
-      "provider_symbol": "US30Y",
-      "name": "US30Y",
-      "asset_class": "Fixed Income",
-      "exchange": "",
-      "currency": "USD",
-      "active": true,
-      "scheduler_enabled": true,
-      "tags": [
-        "core"
-      ],
-      "update_frequency": "15min"
-    },
-    {
       "symbol": "USDCAD",
       "provider_symbol": "USD/CAD",
       "name": "USDCAD",
@@ -609,20 +553,6 @@
       "provider_symbol": "USD/JPY",
       "name": "USDJPY",
       "asset_class": "US_EQUITY",
-      "exchange": "",
-      "currency": "USD",
-      "active": true,
-      "scheduler_enabled": true,
-      "tags": [
-        "core"
-      ],
-      "update_frequency": "15min"
-    },
-    {
-      "symbol": "VIX",
-      "provider_symbol": "VIX",
-      "name": "VIX",
-      "asset_class": "Fixed Income",
       "exchange": "",
       "currency": "USD",
       "active": true,
@@ -875,20 +805,6 @@
       "provider_symbol": "XRP/USD",
       "name": "XRPUSD",
       "asset_class": "CRYPTO",
-      "exchange": "",
-      "currency": "USD",
-      "active": true,
-      "scheduler_enabled": true,
-      "tags": [
-        "core"
-      ],
-      "update_frequency": "15min"
-    },
-    {
-      "symbol": "ZCUSD",
-      "provider_symbol": "ZC/USD",
-      "name": "ZCUSD",
-      "asset_class": "Commodities",
       "exchange": "",
       "currency": "USD",
       "active": true,
@@ -1718,18 +1634,6 @@
       "symbol": "BA",
       "provider_symbol": "BA",
       "name": "BA",
-      "asset_class": "US_EQUITY",
-      "exchange": "",
-      "currency": "USD",
-      "active": true,
-      "scheduler_enabled": true,
-      "tags": [],
-      "update_frequency": "daily"
-    },
-    {
-      "symbol": "BA/PA",
-      "provider_symbol": "BA/PA",
-      "name": "BA/PA",
       "asset_class": "US_EQUITY",
       "exchange": "",
       "currency": "USD",
@@ -4094,18 +3998,6 @@
       "symbol": "ALL",
       "provider_symbol": "ALL",
       "name": "ALL",
-      "asset_class": "US_EQUITY",
-      "exchange": "",
-      "currency": "USD",
-      "active": true,
-      "scheduler_enabled": true,
-      "tags": [],
-      "update_frequency": "daily"
-    },
-    {
-      "symbol": "LSEGY",
-      "provider_symbol": "LSEGY",
-      "name": "LSEGY",
       "asset_class": "US_EQUITY",
       "exchange": "",
       "currency": "USD",
@@ -18602,18 +18494,6 @@
       "symbol": "OUST",
       "provider_symbol": "OUST",
       "name": "OUST",
-      "asset_class": "US_EQUITY",
-      "exchange": "",
-      "currency": "USD",
-      "active": true,
-      "scheduler_enabled": true,
-      "tags": [],
-      "update_frequency": "daily"
-    },
-    {
-      "symbol": "HGRAF",
-      "provider_symbol": "HGRAF",
-      "name": "HGRAF",
       "asset_class": "US_EQUITY",
       "exchange": "",
       "currency": "USD",

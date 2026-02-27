@@ -16,6 +16,8 @@ export type Stats = {
   calc_units_total: number;
   asset_classes: string[];
   timeframes: string[];
+  core_count?: number;
+  earnings_count?: number;
 };
 
 export type Asset = {

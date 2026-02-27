@@ -5,8 +5,7 @@ export default async function AppHome() {
   const classes = await riApi.assetClasses();
 
   return (
-    <main className="min-h-screen bg-white text-zinc-900">
-      <div className="mx-auto max-w-6xl px-6 py-10">
+    <div className="mx-auto max-w-6xl">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold">Dashboard</h2>
@@ -27,7 +26,6 @@ export default async function AppHome() {
             ))}
           </div>
         </div>
-      </div>
-    </main>
+    </div>
   );
 }

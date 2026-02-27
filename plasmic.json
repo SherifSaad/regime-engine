@@ -1,0 +1,31 @@
+{
+  "platform": "nextjs",
+  "code": {
+    "lang": "ts",
+    "scheme": "blackbox",
+    "reactRuntime": "classic"
+  },
+  "style": {
+    "scheme": "css-modules",
+    "defaultStyleCssFilePath": ""
+  },
+  "images": {
+    "scheme": "public-files",
+    "publicDir": "public/plasmic",
+    "publicUrlPrefix": "/plasmic/"
+  },
+  "tokens": {
+    "scheme": "theo",
+    "tokensFilePath": "plasmic-tokens.theo.json"
+  },
+  "srcDir": ".",
+  "defaultPlasmicDir": "plasmic",
+  "projects": [],
+  "globalVariants": {
+    "variantGroups": []
+  },
+  "wrapPagesWithGlobalContexts": true,
+  "preserveJsImportExtensions": false,
+  "cliVersion": "0.1.27",
+  "$schema": "https://unpkg.com/@plasmicapp/cli@0.1.27/dist/plasmic.schema.json"
+}
