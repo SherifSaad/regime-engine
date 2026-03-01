@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { AppShell } from "@/components/dashboard/AppShell";
+import { Geist, Geist_Mono, Bebas_Neue } from "next/font/google";
 import "./globals.css";
+import AppFooter from "@/components/AppFooter";
+import CookieBanner from "@/components/legal/CookieBanner";
+// import AppHeaderLegal from "@/components/AppHeaderLegal";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -10,6 +12,12 @@ const geistSans = Geist({
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+const bebasNeue = Bebas_Neue({
+  weight: "400",
+  variable: "--font-bebas-neue",
   subsets: ["latin"],
 });
 
@@ -27,9 +35,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${bebasNeue.variable} antialiased`}
       >
-        <AppShell>{children}</AppShell>
+        {/* Cookie consent banner (QC-safe defaults) */}
+        <CookieBanner />
+        {/* Optional: a simple legal-links header everywhere */}
+        {/* <AppHeaderLegal /> */}
+
+        {children}
+        <AppFooter />
       </body>
     </html>
   );

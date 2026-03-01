@@ -35,6 +35,7 @@
 
 | Doc | Purpose |
 |-----|---------|
+| [UI_JOURNEY_AND_PLAN.md](UI_JOURNEY_AND_PLAN.md) | **UI overview.** History, current state, and plan for Explorer/screener |
 | [UI_PERCENTILE_REFERENCE_DISTRIBUTIONS.md](UI_PERCENTILE_REFERENCE_DISTRIBUTIONS.md) | **Required** UI labels for percentile types |
 | [REPRODUCIBILITY.md](REPRODUCIBILITY.md) | Deterministic compute, manifests |
 | [VULTR_RUN_PLAN.md](VULTR_RUN_PLAN.md) | **Vultr:** Track progress, resume, transfer for 1600 symbols |

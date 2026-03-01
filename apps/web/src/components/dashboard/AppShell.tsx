@@ -1,41 +1,53 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import {
-  House,
-  ChartLine,
+  ChartPieSlice,
   Database,
-  ChartBar,
-  Question,
+  Bell,
+  MapTrifold,
+  FileText,
   CaretUp,
+  User,
+  ShieldCheck,
+  EnvelopeSimple,
+  ClipboardText,
 } from "@phosphor-icons/react"
 
 const SIDEBAR_LINKS = [
-  { href: "/", label: "Home", Icon: House },
-  { href: "/app", label: "Assets", Icon: Database },
-  { href: "/dashboard", label: "My Dashboard", Icon: ChartLine },
-  { href: "/app", label: "Statistics", Icon: ChartBar },
-  { href: "/faq", label: "FAQ", Icon: Question },
+  { href: "/overview", label: "Global Overview", Icon: ChartPieSlice },
+  { href: "/markets", label: "Markets", Icon: Database },
+  { href: "/alerts", label: "Alerts Center", Icon: Bell },
+  { href: "/market-map", label: "Market Map", Icon: MapTrifold },
+  { href: "/audit", label: "Audit", Icon: FileText },
+  { href: "/settings/profile", label: "Profile", Icon: User },
+  { href: "/settings/legal", label: "Legal & Consents", Icon: ClipboardText },
+  { href: "/settings/privacy", label: "Privacy", Icon: ShieldCheck },
+  { href: "/settings/communications", label: "Communications", Icon: EnvelopeSimple },
 ]
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
   return (
     <div className="flex min-h-screen bg-zinc-100">
-      <aside className="fixed left-0 top-0 z-40 flex min-h-screen w-56 flex-col bg-[#0d4f3c] p-5">
-        <Link href="/" className="block p-2">
-          <img src="/Logo_RI_Green_noback.png" alt="Regime Intelligence" className="h-16 w-16 object-contain" />
+      <aside className="fixed left-0 top-0 z-40 flex min-h-screen w-56 flex-col rounded-r-2xl bg-[#0d4f3c] p-5 shadow-lg">
+        <Link href="/" className="flex justify-center p-2">
+          <img src="/Logo_RI_Green_noback.png" alt="Regime Intelligence" className="h-48 w-48 object-contain" />
         </Link>
         <nav className="mt-6">
-          {SIDEBAR_LINKS.map((link) => (
+          {SIDEBAR_LINKS.map((link) => {
+            const isActive = pathname.startsWith(link.href)
+            return (
             <Link
               key={link.label}
               href={link.href}
-              className="mb-1 flex items-center gap-3 rounded-lg px-4 py-3 text-white/90 hover:bg-white/10 hover:text-white"
+              className={`mb-1 flex items-center gap-3 rounded-lg px-4 py-3 ${isActive ? "bg-[#22c55e] text-white" : "text-white/90 hover:bg-white/10 hover:text-white"}`}
             >
               <link.Icon size={22} weight="regular" />
               <span className="text-sm font-medium">{link.label}</span>
             </Link>
-          ))}
+          )})}
         </nav>
         <button
           type="button"
@@ -48,21 +60,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="ml-56 flex-1">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-end border-b border-zinc-200 bg-white px-8">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-zinc-600 hover:text-zinc-900">
-              Dashboard
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-8">
+          <h1 className="text-lg font-semibold text-zinc-900">Regime Intelligence</h1>
+          <nav className="flex items-center gap-6 text-sm">
+            <Link href="/" className="text-zinc-600 hover:text-zinc-900">
+              Home
             </Link>
-            <Link href="/login" className="text-zinc-600 hover:text-zinc-900">
-              Log in
+            <Link href="/markets" className="text-zinc-600 hover:text-zinc-900">
+              Markets
             </Link>
-            <Link
-              href="/signup"
-              className="rounded bg-[#22c55e] px-4 py-2 text-sm font-medium text-white hover:bg-[#1ea34e]"
-            >
-              Sign up free
-            </Link>
-          </div>
+          </nav>
         </header>
 
         <main className="p-8 pt-10">{children}</main>

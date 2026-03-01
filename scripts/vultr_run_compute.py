@@ -89,7 +89,7 @@ def run_compute(symbol: str) -> tuple[str, bool, float, str]:
             env=env,
             capture_output=True,
             text=True,
-            timeout=1800,
+            timeout=None,  # unlimited; heavy symbols (BTCUSD, AAPL, etc.) can take hours
         )
         duration = time.perf_counter() - t0
         if r.returncode == 0:

@@ -1,39 +1,84 @@
-import Link from "next/link"
+import { AssetPageNav } from "./AssetPageNav"
+import { AssetHeader } from "./AssetHeader"
+import { MarketSnapshotBlock } from "./MarketSnapshotBlock"
+import { MetricsBlock } from "./MetricsBlock"
+import { ProfileBlock } from "./ProfileBlock"
+import { StatisticsBlock } from "./StatisticsBlock"
+import { EarningsBlock } from "./EarningsBlock"
+import { AnalystBlock } from "./AnalystBlock"
+import type { AssetLayoutProps } from "@/lib/assetLayoutTypes"
 
-type Props = { symbol: string; name: string }
+const TF_5 = ["15m", "1h", "4h", "1d", "1w"]
+const TF_2 = ["1d", "1w"]
 
-export function LayoutEquities({ symbol, name }: Props) {
+export function LayoutEquities({
+  symbol,
+  name,
+  assetClass,
+  quote,
+  marketCap,
+  nextEarningsDate,
+  logo,
+  profile,
+  statistics,
+  earnings,
+  analyst,
+  isPaid = false,
+  regimeByTf = {},
+}: AssetLayoutProps) {
+  const isEarnings = assetClass === "US_EQUITY"
+  const timeframes = isEarnings ? TF_2 : TF_5
   return (
     <div>
-      <Link href="/" className="text-sm text-zinc-500 hover:text-zinc-900">← Back</Link>
-      <div className="mt-4 mb-6">
-        <h1 className="text-2xl font-bold text-zinc-900">{symbol}</h1>
-        <p className="text-zinc-600">{name}</p>
-        <span className="mt-2 inline-block rounded bg-zinc-200 px-2 py-0.5 text-xs">Equities</span>
+      <AssetPageNav symbol={symbol} assetClass={assetClass} />
+      <div className="mb-6">
+        <AssetHeader
+          symbol={symbol}
+          name={name}
+          assetClassLabel="Equities"
+          logo={logo}
+          sector={profile?.sector}
+          industry={profile?.industry}
+        />
       </div>
 
-      <div className="mb-6 rounded-xl border bg-white p-6">
-        <h2 className="font-semibold text-zinc-900">Price & Change</h2>
-        <p className="mt-2 text-3xl font-bold">$178.42</p>
-        <p className="text-green-600">+1.2%</p>
+      <div className="mb-6">
+        <MarketSnapshotBlock
+          price={quote?.close}
+          changePct={quote?.percent_change}
+          volume={quote?.volume}
+          dayRangeLow={quote?.low ? parseFloat(quote.low) : null}
+          dayRangeHigh={quote?.high ? parseFloat(quote.high) : null}
+          marketCap={marketCap}
+          nextEarningsDate={nextEarningsDate}
+          format="currency"
+        />
       </div>
 
-      <div className="mb-6 rounded-xl border bg-white p-6">
-        <h2 className="font-semibold text-zinc-900">Regime / Escalation</h2>
-        <div className="mt-4 flex flex-wrap gap-4">
-          {["15m", "1h", "4h", "1d", "1w"].map((tf) => (
-            <div key={tf} className="rounded border p-3">
-              <span className="text-xs text-zinc-500">{tf}</span>
-              <p className="font-bold">72%</p>
-            </div>
-          ))}
+      <div className="mb-6">
+        <MetricsBlock timeframes={timeframes} regimeByTf={regimeByTf} isPaid={isPaid} />
+      </div>
+
+      {profile && (
+        <div className="mb-6">
+          <ProfileBlock profile={profile} />
         </div>
-      </div>
-
-      <div className="mb-6 rounded-xl border bg-white p-6">
-        <h2 className="font-semibold text-zinc-900">Earnings</h2>
-        <p className="mt-2 text-sm text-zinc-600">Next report: Q1 2025 (est.)</p>
-      </div>
+      )}
+      {statistics && (
+        <div className="mb-6">
+          <StatisticsBlock statistics={statistics} />
+        </div>
+      )}
+      {earnings && (
+        <div className="mb-6">
+          <EarningsBlock earnings={earnings} />
+        </div>
+      )}
+      {analyst && (
+        <div className="mb-6">
+          <AnalystBlock analyst={analyst} />
+        </div>
+      )}
     </div>
   )
 }

@@ -1,47 +1,52 @@
-@import "tailwindcss";
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-border: var(--border);
-  --color-ring: var(--ring);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-}
-
-:root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --border: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --primary: oklch(0.21 0.02 260);
-  --primary-foreground: oklch(0.985 0 0);
-  --accent: oklch(0.97 0.01 260);
-  --accent-foreground: oklch(0.21 0.02 260);
-  --secondary: oklch(0.96 0.01 260);
-  --secondary-foreground: oklch(0.21 0.02 260);
-  --muted: oklch(0.96 0.01 260);
-  --muted-foreground: oklch(0.45 0.02 260);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --ring: oklch(0.556 0 0);
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
+  :root {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --border: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+    --primary: oklch(0.21 0.02 260);
+    --primary-foreground: oklch(0.985 0 0);
+    --accent: oklch(0.97 0.01 260);
+    --accent-foreground: oklch(0.21 0.02 260);
+    --secondary: oklch(0.96 0.01 260);
+    --secondary-foreground: oklch(0.21 0.02 260);
+    --muted: oklch(0.96 0.01 260);
+    --muted-foreground: oklch(0.45 0.02 260);
   }
+
+  .dark {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --border: oklch(1 0 0 / 10%);
+    --ring: oklch(0.556 0 0);
+  }
+
+  * {
+    @apply border-border;
+  }
+
   body {
     @apply bg-background text-foreground;
+  }
+
+  .legal-doc h2 {
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    font-size: 1.1em;
+  }
+  .legal-doc h2:first-child {
+    margin-top: 0;
+  }
+  .legal-doc h3 {
+    margin-top: 1em;
+    margin-bottom: 0.35em;
+    font-size: 1em;
+  }
+  .legal-doc a {
+    text-decoration: underline;
   }
 }
